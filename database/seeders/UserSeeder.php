@@ -175,6 +175,20 @@ class UserSeeder extends Seeder
                 "updated_at" => now(),
             ],
 
+            // Test user for notifications (Acme Manager with email and phone for testing)
+            [
+                "company_id" => $acme->id,
+                "role_id" => $manager->id,
+                "first_name" => "Tarachand",
+                "last_name" => "Khorwal",
+                "email" => "web.tarachand@gmail.com",
+                "password" => Hash::make("password"),
+                "phone" => "9136248458",
+                "is_active" => true,
+                "created_at" => now(),
+                "updated_at" => now(),
+            ],
+
             // Inactive user for testing
             [
                 "company_id" => $acme->id,

@@ -2,100 +2,96 @@
 
 namespace App\Services\Notification\Channels;
 
-use App\Models\Alert;
-use App\Models\AlertNotification;
-use App\Models\Area;
-use App\Models\User;
-use Exception;
+use App\Services\Notification\Contracts\NotificationChannelInterface;
+use App\Services\Notification\DTOs\NotificationPayload;
+use App\Services\Notification\DTOs\NotificationResult;
+use App\Services\Notification\Providers\MsgClubProvider;
 use Illuminate\Support\Facades\Log;
 
-class SmsChannel implements NotificationChannelInterface
+readonly class SmsChannel implements NotificationChannelInterface
 {
-    /**
-     * Send SMS notification for an alert
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param Area $area
-     * @return bool
-     */
-    public function send(Alert $alert, User $user, Area $area): bool
+    public function __construct(private MsgClubProvider $provider) {}
+
+    public function send(NotificationPayload $payload): NotificationResult
     {
-        // Create notification record
-        $notification = AlertNotification::create([
-            'alert_id' => $alert->id,
-            'user_id' => $user->id,
-            'channel' => 'sms',
-            'sent_at' => now(),
-            'is_delivered' => false,
-        ]);
-
         try {
-            // TODO: Implement SMS gateway integration (Twilio, AWS SNS, etc.)
-            // Example:
-            // $smsContent = $this->createSmsContent($alert);
-            // $response = $this->smsGateway->send($user->phone, $smsContent);
-            // $externalReference = $response->messageId;
+            // Check if user has a phone number
+            if (empty($payload->user->phone)) {
+                return NotificationResult::failure("User has no phone number");
+            }
 
-            $smsContent = $this->createSmsContent($alert);
+            // Get SMS template and replace placeholders
+            $message = $this->generateSmsMessage($payload);
 
-            // Store message content
-            $notification->update([
-                'message_content' => $smsContent,
+            // Get template ID for the event
+            $templateId = $this->getTemplateId($payload);
+
+            // Send via MsgClub SMS API
+            $response = $this->provider->sendSms(
+                mobile: $payload->user->phone,
+                message: $message,
+                templateId: $templateId,
+            );
+
+            return NotificationResult::fromProviderResponse($response);
+        } catch (\Exception $e) {
+            Log::error("SMS notification failed", [
+                "alert_id" => $payload->alertId,
+                "user_id" => $payload->userId,
+                "error" => $e->getMessage(),
             ]);
 
-            // Stub: Mark as delivered for now
-            // TODO: Integrate with actual SMS service provider
-            $notification->markDelivered('stub-sms-reference-' . uniqid());
-
-            Log::info('Alert SMS notification stub sent', [
-                'alert_id' => $alert->id,
-                'user_id' => $user->id,
-                'phone' => $user->phone,
-            ]);
-
-            return true;
-        } catch (Exception $e) {
-            $notification->markFailed($e->getMessage());
-
-            Log::error('Failed to send alert SMS notification', [
-                'alert_id' => $alert->id,
-                'user_id' => $user->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
+            return NotificationResult::failure($e->getMessage());
         }
     }
 
-    /**
-     * Create SMS content for alert (max 160 characters recommended)
-     *
-     * @param Alert $alert
-     * @return string
-     */
-    public function createSmsContent(Alert $alert): string
+    public function supports(string $channel): bool
     {
-        $device = $alert->device;
-        $deviceName = $device->device_name ?? $device->device_code;
+        return $channel === "sms";
+    }
 
-        return sprintf(
-            '[%s ALERT] %s: %s at %s. Value: %s. Check system for details.',
-            strtoupper($alert->severity->value),
-            $alert->type->label(),
-            $deviceName,
-            $device->area?->name ?? 'Unknown',
-            number_format($alert->trigger_value, 1)
-        );
+    public function getChannelName(): string
+    {
+        return "sms";
     }
 
     /**
-     * Get channel name
-     *
-     * @return string
+     * Get template key based on event
      */
-    public function getName(): string
+    private function getTemplateKey(string $event): string
     {
-        return 'sms';
+        return match ($event) {
+            "acknowledged" => "alert_acknowledged",
+            "resolved" => "alert_resolved",
+            "back_in_range" => "alert_back_in_range",
+            default => "alert_triggered",
+        };
+    }
+
+    /**
+     * Generate SMS message from template
+     */
+    private function generateSmsMessage(NotificationPayload $payload): string
+    {
+        $templates = config("notifications.templates.sms");
+        $templateKey = $this->getTemplateKey($payload->event);
+
+        $template =
+            $templates[$templateKey]["content"] ??
+            $templates["alert_triggered"]["content"];
+
+        return $payload->replaceTemplate($template);
+    }
+
+    /**
+     * Get SMS template ID for the event
+     */
+    private function getTemplateId(NotificationPayload $payload): ?string
+    {
+        $templates = config("notifications.templates.sms");
+        $templateKey = $this->getTemplateKey($payload->event);
+
+        return $templates[$templateKey]["id"] ??
+            ($templates["alert_triggered"]["id"] ?? null);
     }
 }

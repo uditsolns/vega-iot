@@ -23,6 +23,9 @@ use App\Policies\RolePolicy;
 use App\Policies\TicketPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Support\Facades\Gate;
+use App\Events\ReadingReceived;
+use App\Listeners\ProcessReadingForAlertsListener;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -51,5 +54,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(DeviceReading::class, ReadingPolicy::class);
         Gate::policy(Alert::class, AlertPolicy::class);
         Gate::policy(Ticket::class, TicketPolicy::class);
+
+        // Event listeners are auto-discovered from app/Listeners
+        // No need to manually register them here
     }
 }

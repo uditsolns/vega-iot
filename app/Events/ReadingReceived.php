@@ -43,7 +43,7 @@ class ReadingReceived implements ShouldBroadcast
      */
     public function broadcastOn(): Channel
     {
-        return new Channel('devices.' . $this->device->id);
+        return new Channel("devices." . $this->device->id);
     }
 
 }

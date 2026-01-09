@@ -2,137 +2,95 @@
 
 namespace App\Services\Notification\Channels;
 
-use App\Models\Alert;
-use App\Models\AlertNotification;
-use App\Models\Area;
-use App\Models\User;
+use App\Services\Notification\Contracts\NotificationChannelInterface;
+use App\Services\Notification\DTOs\NotificationPayload;
+use App\Services\Notification\DTOs\NotificationResult;
+use App\Services\Notification\Providers\MsgClubProvider;
 use Exception;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
-class EmailChannel implements NotificationChannelInterface
+readonly class EmailChannel implements NotificationChannelInterface
 {
-    /**
-     * Send email notification for an alert
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param Area $area
-     * @return bool
-     */
-    public function send(Alert $alert, User $user, Area $area): bool
+    public function __construct(
+        private MsgClubProvider $provider
+    ) {}
+
+    public function send(NotificationPayload $payload): NotificationResult
     {
-        // Create notification record
-        $notification = AlertNotification::create([
-            'alert_id' => $alert->id,
-            'user_id' => $user->id,
-            'channel' => 'email',
-            'sent_at' => now(),
-            'is_delivered' => false,
-        ]);
-
         try {
-            // Create email content
-            $emailContent = $this->createEmailContent($alert, $area);
+            // Generate HTML content from Blade template
+            $htmlContent = $this->renderEmailTemplate($payload);
 
-            // Send email using Laravel Mail facade
-            Mail::raw($emailContent['body'], function ($message) use ($user, $emailContent) {
-                $message->to($user->email)
-                    ->subject($emailContent['subject']);
-            });
+            // Generate subject line
+            $subject = $this->generateSubject($payload);
 
-            // Mark as delivered
-            $notification->markDelivered();
+            // Send via MsgClub Email API
+            $response = $this->provider->sendEmail(
+                email: $payload->user->email,
+                name: "{$payload->user->first_name} {$payload->user->last_name}",
+                subject: $subject,
+                htmlContent: $htmlContent
+            );
 
-            Log::info('Alert email notification sent', [
-                'alert_id' => $alert->id,
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
-
-            return true;
+            return NotificationResult::fromProviderResponse($response);
         } catch (Exception $e) {
-            // Mark as failed
-            $notification->markFailed($e->getMessage());
-
-            Log::error('Failed to send alert email notification', [
-                'alert_id' => $alert->id,
-                'user_id' => $user->id,
+            Log::error('Email notification failed', [
+                'alert_id' => $payload->alertId,
+                'user_id' => $payload->userId,
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return NotificationResult::failure($e->getMessage());
         }
     }
 
-    /**
-     * Create email content for alert
-     *
-     * @param Alert $alert
-     * @param Area $area
-     * @return array [subject, body]
-     */
-    public function createEmailContent(Alert $alert, Area $area): array
+    public function supports(string $channel): bool
     {
-        $device = $alert->device;
-        $locationPath = $device->getLocationPath();
-
-        // Build subject
-        $subject = sprintf(
-            '[%s ALERT] %s - %s',
-            strtoupper($alert->severity->value),
-            $alert->type->label(),
-            $device->device_name ?? $device->device_code
-        );
-
-        // Build body
-        $body = "ALERT NOTIFICATION\n";
-        $body .= "==================\n\n";
-        $body .= "Severity: " . strtoupper($alert->severity->value) . "\n";
-        $body .= "Type: " . $alert->type->label() . "\n";
-        $body .= "Status: " . $alert->status->label() . "\n\n";
-
-        $body .= "DEVICE INFORMATION\n";
-        $body .= "------------------\n";
-        $body .= "Device: " . ($device->device_name ?? $device->device_code) . "\n";
-        $body .= "Device Code: " . $device->device_code . "\n";
-        $body .= "Location: " . $locationPath . "\n";
-        $body .= "Area: " . $area->name . "\n\n";
-
-        $body .= "ALERT DETAILS\n";
-        $body .= "-------------\n";
-        $body .= "Reason: " . $alert->reason . "\n";
-        $body .= "Trigger Value: " . number_format($alert->trigger_value, 2) . "\n";
-        $body .= "Threshold Breached: " . $alert->threshold_breached . "\n";
-        $body .= "Started At: " . $alert->started_at->format('Y-m-d H:i:s') . "\n";
-
-        if ($alert->acknowledged_at) {
-            $body .= "\nACKNOWLEDGMENT\n";
-            $body .= "--------------\n";
-            $body .= "Acknowledged By: " . ($alert->acknowledgedBy?->first_name ?? 'Unknown') . "\n";
-            $body .= "Acknowledged At: " . $alert->acknowledged_at->format('Y-m-d H:i:s') . "\n";
-            if ($alert->acknowledge_comment) {
-                $body .= "Comment: " . $alert->acknowledge_comment . "\n";
-            }
-        }
-
-        $body .= "\n--\n";
-        $body .= "VEGA IoT Sensor Management System\n";
-        $body .= "This is an automated alert notification. Please do not reply to this email.\n";
-
-        return [
-            'subject' => $subject,
-            'body' => $body,
-        ];
+        return $channel === 'email';
     }
 
-    /**
-     * Get channel name
-     *
-     * @return string
-     */
-    public function getName(): string
+    public function getChannelName(): string
     {
         return 'email';
+    }
+
+    /**
+     * Render the email template for the given event
+     */
+    private function renderEmailTemplate(NotificationPayload $payload): string
+    {
+        $templateMap = [
+            'triggered' => 'emails.alerts.triggered',
+            'acknowledged' => 'emails.alerts.acknowledged',
+            'resolved' => 'emails.alerts.resolved',
+            'back_in_range' => 'emails.alerts.back-in-range',
+        ];
+
+        $template = $templateMap[$payload->event] ?? 'emails.alerts.triggered';
+
+        return view($template, [
+            'alert' => $payload->alert,
+            'user' => $payload->user,
+            'device' => $payload->device,
+            'area' => $payload->area,
+            'data' => $payload->data,
+        ])->render();
+    }
+
+    /**
+     * Generate email subject line
+     */
+    private function generateSubject(NotificationPayload $payload): string
+    {
+        $severity = ucfirst($payload->alert->severity->value);
+        $deviceCode = $payload->device->device_code;
+
+        return match($payload->event) {
+            'triggered' => "$severity Alert: Device $deviceCode",
+            'acknowledged' => "Alert Acknowledged: Device $deviceCode",
+            'resolved' => "Alert Resolved: Device $deviceCode",
+            'back_in_range' => "Device Back in Range: $deviceCode",
+            default => "Alert Notification: Device $deviceCode",
+        };
     }
 }

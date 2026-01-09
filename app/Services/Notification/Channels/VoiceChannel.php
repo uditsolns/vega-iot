@@ -2,113 +2,67 @@
 
 namespace App\Services\Notification\Channels;
 
-use App\Enums\AlertSeverity;
-use App\Models\Alert;
-use App\Models\AlertNotification;
-use App\Models\Area;
-use App\Models\User;
-use Exception;
+use App\Services\Notification\Contracts\NotificationChannelInterface;
+use App\Services\Notification\DTOs\NotificationPayload;
+use App\Services\Notification\DTOs\NotificationResult;
+use App\Services\Notification\Providers\MsgClubProvider;
 use Illuminate\Support\Facades\Log;
 
-class VoiceChannel implements NotificationChannelInterface
+readonly class VoiceChannel implements NotificationChannelInterface
 {
-    /**
-     * Send voice call notification for an alert
-     * Only for critical severity alerts
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param Area $area
-     * @return bool
-     */
-    public function send(Alert $alert, User $user, Area $area): bool
+    public function __construct(
+        private MsgClubProvider $provider
+    ) {}
+
+    public function send(NotificationPayload $payload): NotificationResult
     {
-        // Voice notifications only for critical alerts
-        if ($alert->severity !== AlertSeverity::Critical) {
-            Log::info('Skipping voice notification for non-critical alert', [
-                'alert_id' => $alert->id,
-                'severity' => $alert->severity->value,
-            ]);
-            return false;
-        }
-
-        // Create notification record
-        $notification = AlertNotification::create([
-            'alert_id' => $alert->id,
-            'user_id' => $user->id,
-            'channel' => 'voice',
-            'sent_at' => now(),
-            'is_delivered' => false,
-        ]);
-
         try {
-            // TODO: Implement voice call gateway integration (Twilio Voice, etc.)
-            // Example:
-            // $voiceMessage = $this->createVoiceMessage($alert);
-            // $response = $this->voiceGateway->call($user->phone, $voiceMessage);
-            // $externalReference = $response->callSid;
+            // Check if user has a phone number
+            if (empty($payload->user->phone)) {
+                return NotificationResult::failure('User has no phone number');
+            }
 
-            $voiceMessage = $this->createVoiceMessage($alert);
+            // Get Voice template and replace placeholders
+            $message = $this->generateVoiceMessage($payload);
 
-            // Store message content
-            $notification->update([
-                'message_content' => $voiceMessage,
-            ]);
+            // Send via MsgClub Voice API
+            $response = $this->provider->sendVoice(
+                mobile: $payload->user->phone,
+                message: $message
+            );
 
-            // Stub: Mark as delivered for now
-            // TODO: Integrate with actual voice call service provider
-            $notification->markDelivered('stub-voice-reference-' . uniqid());
-
-            Log::info('Alert voice notification stub sent', [
-                'alert_id' => $alert->id,
-                'user_id' => $user->id,
-                'phone' => $user->phone,
-            ]);
-
-            return true;
-        } catch (Exception $e) {
-            $notification->markFailed($e->getMessage());
-
-            Log::error('Failed to send alert voice notification', [
-                'alert_id' => $alert->id,
-                'user_id' => $user->id,
+            return NotificationResult::fromProviderResponse($response);
+        } catch (\Exception $e) {
+            Log::error('Voice notification failed', [
+                'alert_id' => $payload->alertId,
+                'user_id' => $payload->userId,
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return NotificationResult::failure($e->getMessage());
         }
     }
 
-    /**
-     * Create voice message script for alert
-     *
-     * @param Alert $alert
-     * @return string
-     */
-    public function createVoiceMessage(Alert $alert): string
+    public function supports(string $channel): bool
     {
-        $device = $alert->device;
-        $deviceName = $device->device_name ?? $device->device_code;
-        $areaName = $device->area?->name ?? 'unknown area';
+        return $channel === 'voice';
+    }
 
-        return sprintf(
-            'Critical alert notification. %s alert for device %s in %s. ' .
-            'Trigger value is %s. Please check the system immediately. ' .
-            'This is a critical alert from VEGA IoT Sensor Management System.',
-            $alert->type->label(),
-            $deviceName,
-            $areaName,
-            number_format($alert->trigger_value, 1)
-        );
+    public function getChannelName(): string
+    {
+        return 'voice';
     }
 
     /**
-     * Get channel name
-     *
-     * @return string
+     * Generate voice message from template
      */
-    public function getName(): string
+    private function generateVoiceMessage(NotificationPayload $payload): string
     {
-        return 'voice';
+        $templates = config('notifications.templates.voice');
+
+        $template = $templates['alert_triggered'] ??
+            'Critical Alert: Device {code} in {location}. Current value: {value}. Immediate action required.';
+
+        return $payload->replaceTemplate($template);
     }
 }

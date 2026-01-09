@@ -15,21 +15,25 @@ class AlertNotificationResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'alert_id' => $this->alert_id,
-            'user_id' => $this->user_id,
-            'channel' => $this->channel,
-            'status' => $this->status,
-            'sent_at' => $this->sent_at?->toISOString(),
-            'delivered_at' => $this->delivered_at?->toISOString(),
-            'failed_at' => $this->failed_at?->toISOString(),
-            'error_message' => $this->error_message,
-            'notification_reference' => $this->notification_reference,
-            'created_at' => $this->created_at->toISOString(),
+            "id" => $this->id,
+            "alert_id" => $this->alert_id,
+            "user_id" => $this->user_id,
+            "channel" => $this->channel,
+            "status" => $this->status->value,
+            "event" => $this->event,
+            "queued_at" => $this->queued_at?->toISOString(),
+            "sent_at" => $this->sent_at?->toISOString(),
+            "failed_at" => $this->failed_at?->toISOString(),
+            "retry_count" => $this->retry_count,
+            "error_message" => $this->error_message,
+            "message_content" => $this->message_content,
+            "external_reference" => $this->external_reference,
+            "created_at" => $this->created_at->toISOString(),
+            "updated_at" => $this->updated_at->toISOString(),
 
             // Relationships
-            'alert' => new AlertResource($this->whenLoaded('alert')),
-            'user' => new UserResource($this->whenLoaded('user')),
+            "alert" => new AlertResource($this->whenLoaded("alert")),
+            "user" => new UserResource($this->whenLoaded("user")),
         ];
     }
 }

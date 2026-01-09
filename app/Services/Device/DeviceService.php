@@ -28,6 +28,7 @@ readonly class DeviceService
     public function list(array $filters, User $user): LengthAwarePaginator
     {
         return QueryBuilder::for(Device::forUser($user))
+            ->with('')
             ->allowedFilters([
                 AllowedFilter::exact("status"),
                 AllowedFilter::exact("type"),

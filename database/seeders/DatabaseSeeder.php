@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             DeviceSeeder::class,
             DeviceReadingSeeder::class,
-            AlertSeeder::class,
         ]);
     }
 }

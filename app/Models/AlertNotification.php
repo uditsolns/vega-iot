@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AlertNotificationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,15 +25,18 @@ class AlertNotification extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'alert_id',
-        'user_id',
-        'channel',
-        'sent_at',
-        'is_delivered',
-        'delivered_at',
-        'delivery_error',
-        'message_content',
-        'external_reference',
+        "alert_id",
+        "user_id",
+        "channel",
+        "status",
+        "event",
+        "queued_at",
+        "sent_at",
+        "failed_at",
+        "retry_count",
+        "message_content",
+        "external_reference",
+        "error_message",
     ];
 
     /**
@@ -43,9 +47,11 @@ class AlertNotification extends Model
     protected function casts(): array
     {
         return [
-            'sent_at' => 'datetime',
-            'is_delivered' => 'boolean',
-            'delivered_at' => 'datetime',
+            "status" => AlertNotificationStatus::class,
+            "queued_at" => "datetime",
+            "sent_at" => "datetime",
+            "failed_at" => "datetime",
+            "retry_count" => "integer",
         ];
     }
 
@@ -74,11 +80,11 @@ class AlertNotification extends Model
     // ========================================
 
     /**
-     * Scope to delivered notifications
+     * Scope to sent notifications
      */
-    public function scopeDelivered(Builder $query): Builder
+    public function scopeSent(Builder $query): Builder
     {
-        return $query->where('is_delivered', true);
+        return $query->where("status", AlertNotificationStatus::Sent);
     }
 
     /**
@@ -86,8 +92,7 @@ class AlertNotification extends Model
      */
     public function scopeFailed(Builder $query): Builder
     {
-        return $query->where('is_delivered', false)
-            ->whereNotNull('delivery_error');
+        return $query->where("status", AlertNotificationStatus::Failed);
     }
 
     /**
@@ -95,8 +100,7 @@ class AlertNotification extends Model
      */
     public function scopePending(Builder $query): Builder
     {
-        return $query->where('is_delivered', false)
-            ->whereNull('delivery_error');
+        return $query->where("status", AlertNotificationStatus::Pending);
     }
 
     /**
@@ -104,7 +108,15 @@ class AlertNotification extends Model
      */
     public function scopeByChannel(Builder $query, string $channel): Builder
     {
-        return $query->where('channel', $channel);
+        return $query->where("channel", $channel);
+    }
+
+    /**
+     * Scope to notifications by event
+     */
+    public function scopeByEvent(Builder $query, string $event): Builder
+    {
+        return $query->where("event", $event);
     }
 
     /**
@@ -112,7 +124,7 @@ class AlertNotification extends Model
      */
     public function scopeRecentFirst(Builder $query): Builder
     {
-        return $query->orderBy('sent_at', 'desc');
+        return $query->orderBy("queued_at", "desc");
     }
 
     // ========================================
@@ -120,15 +132,16 @@ class AlertNotification extends Model
     // ========================================
 
     /**
-     * Mark notification as delivered
+     * Mark notification as sent
      */
-    public function markDelivered(?string $externalReference = null): bool
+    public function markSent(?string $externalReference = null): bool
     {
         return $this->update([
-            'is_delivered' => true,
-            'delivered_at' => now(),
-            'external_reference' => $externalReference ?? $this->external_reference,
-            'delivery_error' => null,
+            "status" => AlertNotificationStatus::Sent,
+            "sent_at" => now(),
+            "external_reference" =>
+                $externalReference ?? $this->external_reference,
+            "error_message" => null,
         ]);
     }
 
@@ -138,20 +151,34 @@ class AlertNotification extends Model
     public function markFailed(string $error): bool
     {
         return $this->update([
-            'is_delivered' => false,
-            'delivery_error' => $error,
+            "status" => AlertNotificationStatus::Failed,
+            "failed_at" => now(),
+            "error_message" => $error,
+            "retry_count" => $this->retry_count + 1,
         ]);
     }
 
     /**
-     * Retry sending the notification
+     * Check if notification is pending
      */
-    public function retry(): void
+    public function isPending(): bool
     {
-        $this->update([
-            'sent_at' => now(),
-            'is_delivered' => false,
-            'delivery_error' => null,
-        ]);
+        return $this->status === AlertNotificationStatus::Pending;
+    }
+
+    /**
+     * Check if notification is sent
+     */
+    public function isSent(): bool
+    {
+        return $this->status === AlertNotificationStatus::Sent;
+    }
+
+    /**
+     * Check if notification is failed
+     */
+    public function isFailed(): bool
+    {
+        return $this->status === AlertNotificationStatus::Failed;
     }
 }
