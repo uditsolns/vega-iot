@@ -25,6 +25,9 @@ class Company extends Model
         "shipping_address",
         "gst_number",
         "is_active",
+        "is_hierarchy_enabled",
+        "is_csv_export_enabled",
+        "is_device_config_enabled",
     ];
 
     /**
@@ -36,6 +39,9 @@ class Company extends Model
     {
         return [
             "is_active" => "boolean",
+            "is_hierarchy_enabled" => "boolean",
+            "is_csv_export_enabled" => "boolean",
+            "is_device_config_enabled" => "boolean",
             "deleted_at" => "datetime",
         ];
     }

@@ -30,6 +30,9 @@ class CreateCompanyRequest extends FormRequest
             'shipping_address' => ['nullable', 'string'],
             'gst_number' => ['nullable', 'string', 'max:20'],
             'is_active' => ['sometimes', 'boolean'],
+            'is_hierarchy_enabled' => ['sometimes', 'boolean'],
+            'is_csv_export_enabled' => ['sometimes', 'boolean'],
+            'is_device_config_enabled' => ['sometimes', 'boolean'],
         ];
     }
 

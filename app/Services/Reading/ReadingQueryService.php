@@ -8,6 +8,7 @@ use App\Models\DeviceReading;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\Paginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -53,9 +54,10 @@ class ReadingQueryService
      */
     public function getDeviceReadings(
         Device $device,
-        array $filters,
-        User $user
-    ): Paginator {
+        array  $filters,
+        User   $user
+    ): Paginator
+    {
         $query = DeviceReading::forUser($user)->forDevice($device->id);
 
         // Apply time filters
@@ -90,13 +92,24 @@ class ReadingQueryService
     }
 
     /**
+     * Get the latest reading for a device
+     */
+    public function getReadingsAvailableDates(Device $device, User $user): ?Collection
+    {
+        return DeviceReading::forUser($user)
+            ->forDevice($device->id)
+            ->pluck("recorded_at");
+    }
+
+    /**
      * Get readings for all devices in an area
      */
     public function getAreaReadings(
-        Area $area,
+        Area  $area,
         array $filters,
-        User $user
-    ): Paginator {
+        User  $user
+    ): Paginator
+    {
         $query = DeviceReading::forUser($user)->forArea($area->id);
 
         // Apply time filters

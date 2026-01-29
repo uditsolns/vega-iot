@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\User;
 
+use App\Enums\UserWorkMode;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class CreateUserRequest extends FormRequest
@@ -31,6 +33,8 @@ class CreateUserRequest extends FormRequest
             'role_id' => ['required', 'integer', 'exists:roles,id'],
             'company_id' => ['nullable', 'integer', 'exists:companies,id'],
             'is_active' => ['sometimes', 'boolean'],
+            'dark_theme_enabled' => ['sometimes', 'boolean'],
+            'work_mode' => ['sometimes', Rule::enum(UserWorkMode::class)],
         ];
     }
 

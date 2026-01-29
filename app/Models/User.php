@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\UserWorkMode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +32,8 @@ class User extends Authenticatable
         "last_name",
         "phone",
         "is_active",
+        "dark_theme_enabled",
+        "work_mode",
         "last_login_at",
     ];
 
@@ -51,6 +54,8 @@ class User extends Authenticatable
         return [
             "is_active" => "boolean",
             "password" => "hashed",
+            "dark_theme_enabled" => "boolean",
+            "work_mode" => UserWorkMode::class,
             "last_login_at" => "datetime",
             "deleted_at" => "datetime",
         ];

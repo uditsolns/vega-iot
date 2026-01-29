@@ -20,6 +20,9 @@ return new class extends Migration {
             $table->text("shipping_address")->nullable();
             $table->string("gst_number", 20)->nullable();
             $table->boolean("is_active")->default(true);
+            $table->boolean("is_hierarchy_enabled")->default(false);;
+            $table->boolean("is_csv_export_enabled")->default(false);
+            $table->boolean("is_device_config_enabled")->default(false);
             $table->softDeletes();
             $table->timestamps();
 

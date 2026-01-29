@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserWorkMode;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +25,8 @@ return new class extends Migration {
             $table->string("last_name", 100)->nullable();
             $table->string("phone", 20)->nullable();
             $table->boolean("is_active")->default(true);
+            $table->boolean("dark_theme_enabled")->default(false);
+            $table->enum("work_mode", UserWorkMode::values())->default(UserWorkMode::Storage->value);
             $table->rememberToken();
             $table->softDeletes();
             $table->timestamps();

@@ -16,9 +16,9 @@ use App\Http\Controllers\Device\DeviceController;
 use App\Http\Controllers\HierarchyController;
 use App\Http\Controllers\IngestController;
 use App\Http\Controllers\ReadingController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HubController;
 use App\Http\Controllers\LocationController;
+use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TicketCommentController;
 use App\Http\Controllers\TicketController;
@@ -248,6 +248,8 @@ Route::prefix("v1")->group(function () {
                 Route::get("{device}/readings/latest", "getLatestReading");
                 Route::get("{device}/alerts", "getAlerts");
                 Route::patch("{id}/restore", "restore");
+
+                Route::get("{device}/readings/available-dates", "getReadingsAvailableDates");
             });
 
         // Devices - Configuration (nested resource)
@@ -312,5 +314,13 @@ Route::prefix("v1")->group(function () {
                 Route::get("users/{user}/activity", "userActivity");
                 Route::get("resource-history", "resourceHistory");
             });
+
+        // Reports
+        Route::prefix("reports")
+            ->controller(ReportController::class)
+            ->group(function () {
+                Route::get("/", "index");
+                Route::post("/", "store");
+        });
     });
 });

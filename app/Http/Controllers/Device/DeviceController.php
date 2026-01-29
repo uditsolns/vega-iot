@@ -261,6 +261,25 @@ class DeviceController extends Controller
     }
 
     /**
+     * Get the latest reading for a device.
+     */
+    public function getReadingsAvailableDates(Device $device): JsonResponse
+    {
+        $this->authorize("viewDevice", [DeviceReading::class, $device]);
+
+        $dates = $this->readingQueryService->getReadingsAvailableDates(
+            $device,
+            request()->user(),
+        );
+
+        if (!$dates) {
+            return $this->success(null, "No readings found for this device");
+        }
+
+        return $this->success($dates);
+    }
+
+    /**
      * Get device alerts (stub for Phase 5).
      */
     public function getAlerts(Device $device): JsonResponse

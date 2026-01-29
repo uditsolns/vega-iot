@@ -22,11 +22,15 @@ readonly class CompanyService
     public function list(array $filters, User $user): LengthAwarePaginator
     {
         return QueryBuilder::for(Company::forUser($user))
+            ->withCount(['users', 'devices'])
             ->allowedFilters([
                 AllowedFilter::partial("name"),
                 AllowedFilter::partial("client_name"),
                 AllowedFilter::partial("email"),
                 AllowedFilter::exact("is_active"),
+                AllowedFilter::exact("is_hierarchy_enabled"),
+                AllowedFilter::exact("is_csv_export_enabled"),
+                AllowedFilter::exact("is_device_config_enabled"),
             ])
             ->allowedSorts(["name", "created_at"])
             ->allowedIncludes(["users", "roles"])

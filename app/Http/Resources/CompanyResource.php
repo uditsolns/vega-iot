@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/* @mixin Company */
 class CompanyResource extends JsonResource
 {
     /**
@@ -24,11 +26,15 @@ class CompanyResource extends JsonResource
             "shipping_address" => $this->shipping_address,
             "gst_number" => $this->gst_number,
             "is_active" => $this->is_active,
+            "is_hierarchy_enabled" => $this->is_hierarchy_enabled,
+            "is_csv_export_enabled" => $this->is_csv_export_enabled,
+            "is_device_config_enabled" => $this->is_device_config_enabled,
 
             // Conditional: Show users count when available
             "users" => $this->whenLoaded("users"),
             "users_count" => $this->whenCounted("users"),
             "users_exists" => $this->whenExistsLoaded("users"),
+            "devices_count" => $this->whenCounted("devices"),
 
             "roles" => $this->whenLoaded("roles"),
             "roles_exists" => $this->whenExistsLoaded("roles"),

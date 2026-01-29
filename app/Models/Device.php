@@ -98,6 +98,13 @@ class Device extends Model
         );
     }
 
+    public function latestReading(): HasOne
+    {
+        return $this->hasOne(DeviceReading::class)
+            ->orderByDesc("recorded_at")
+            ->limit(1);
+    }
+
     // ========================================
     // SCOPES
     // ========================================

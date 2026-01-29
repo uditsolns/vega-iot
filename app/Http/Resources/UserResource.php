@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/* @mixin User */
 class UserResource extends JsonResource
 {
     /**
@@ -24,6 +26,8 @@ class UserResource extends JsonResource
             "phone" => $this->phone,
             "is_active" => $this->is_active,
             "last_login_at" => $this->last_login_at,
+            "dark_theme_enabled" => $this->dark_theme_enabled,
+            "work_mode" => $this->work_mode,
 
             "company" => new CompanyResource($this->whenLoaded("company")),
             "role" => new RoleResource($this->whenLoaded("role")),
