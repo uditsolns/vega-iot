@@ -5,15 +5,20 @@ namespace App\Services\Report;
 use App\Models\Report;
 use App\Models\User;
 use App\Services\Audit\AuditService;
+use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class ReportService
 {
-    public function __construct(private AuditService $auditService) {}
+    public function __construct(
+        private AuditService $auditService,
+        private ReportGeneratorService $reportGenerator
+    ) {}
+
     /**
-     * Get paginated list of users.
+     * Get paginated list of reports.
      *
      * @param array $filters
      * @param User $user
@@ -43,19 +48,31 @@ readonly class ReportService
     }
 
     /**
-     * Create a new user.
+     * Create a new report.
      *
      * @param array $data
-     * @return User
+     * @return Report
      */
-    public function create(array $data): User
+    public function create(array $data): Report
     {
         // Create report
         $report = Report::create($data);
 
         // Audit log
-        $this->auditService->log("report.created", Report::class, $report);
+        $this->auditService->log("report.generated", Report::class, $report);
 
         return $report;
+    }
+
+    /**
+     * Generate report file (PDF/CSV)
+     *
+     * @param Report $report
+     * @return string File path
+     * @throws Exception
+     */
+    public function generateReport(Report $report): string
+    {
+        return $this->reportGenerator->generate($report);
     }
 }

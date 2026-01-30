@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\ReportDataFormation;
+use App\Enums\ReportFileType;
+use App\Enums\ReportFormat;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +19,7 @@ class Report extends Model
         'generated_by',
         'name',
         'file_type',
-        'report_format',
+        'format',
         'data_formation',
         'interval',
         'from_datetime',
@@ -51,6 +54,9 @@ class Report extends Model
     protected function casts(): array
     {
         return [
+            'file_type' => ReportFileType::class,
+            'format' => ReportFormat::class,
+            'data_formation' => ReportDataFormation::class,
             'from_datetime' => 'datetime',
             'to_datetime' => 'datetime',
             'generated_at' => 'timestamp',

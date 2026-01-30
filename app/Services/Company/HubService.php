@@ -5,13 +5,15 @@ namespace App\Services\Company;
 use App\Models\Device;
 use App\Models\Hub;
 use App\Models\User;
+use App\Services\Audit\AuditService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class HubService
+readonly class HubService
 {
+    public function __construct(private AuditService $auditService) {}
     /**
      * Get paginated list of hubs.
      *
@@ -42,7 +44,12 @@ class HubService
      */
     public function create(array $data): Hub
     {
-        return Hub::create($data);
+        $hub = Hub::create($data);
+
+        // Audit log
+        $this->auditService->log("hub.created", Hub::class, $hub);
+
+        return $hub;
     }
 
     /**
@@ -56,6 +63,9 @@ class HubService
     {
         $hub->update($data);
 
+        // Audit log
+        $this->auditService->log("hub.updated", Hub::class, $hub);
+
         return $hub->fresh();
     }
 
@@ -68,6 +78,9 @@ class HubService
     public function delete(Hub $hub): void
     {
         $hub->delete();
+
+        // Audit log
+        $this->auditService->log("hub.deleted", Hub::class, $hub);
     }
 
     /**
@@ -79,6 +92,9 @@ class HubService
     public function activate(Hub $hub): Hub
     {
         $hub->update(["is_active" => true]);
+
+        // Audit log
+        $this->auditService->log("hub.activated", Hub::class, $hub);
 
         return $hub->fresh();
     }
@@ -93,6 +109,9 @@ class HubService
     {
         $hub->update(["is_active" => false]);
 
+        // Audit log
+        $this->auditService->log("hub.deactivated", Hub::class, $hub);
+
         return $hub->fresh();
     }
 
@@ -105,6 +124,9 @@ class HubService
     public function restore(Hub $hub): Hub
     {
         $hub->restore();
+
+        // Audit log
+        $this->auditService->log("hub.restored", Hub::class, $hub);
 
         return $hub->fresh();
     }

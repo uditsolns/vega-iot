@@ -116,6 +116,27 @@ readonly class DeviceService
     }
 
     /**
+     * Get device statistics for dashboard
+     */
+    public function getDeviceStats(int $companyId): array
+    {
+        $query = Device::where('company_id', $companyId);
+
+        return [
+            'total' => (clone $query)->count(),
+            'active' => (clone $query)->where('is_active', true)->count(),
+            'inactive' => (clone $query)->where('is_active', false)->count(),
+            'online' => (clone $query)->where('status', 'online')->count(),
+            'offline' => (clone $query)->where('status', 'offline')->count(),
+            'maintenance' => (clone $query)->where('status', 'maintenance')->count(),
+            'decommissioned' => (clone $query)->where('status', 'decommissioned')->count(),
+            'system_inventory' => Device::systemInventory()->count(),
+            'company_inventory' => (clone $query)->whereNull('area_id')->count(),
+            'deployed' => (clone $query)->whereNotNull('area_id')->count(),
+        ];
+    }
+
+    /**
      * Assign device to company
      */
     public function assignToCompany(Device $device, array $data): Device

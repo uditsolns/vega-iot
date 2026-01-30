@@ -8,6 +8,7 @@ use App\Http\Resources\ReportResource;
 use App\Models\Report;
 use App\Services\Report\ReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ReportController extends Controller
 {
@@ -29,14 +30,37 @@ class ReportController extends Controller
     {
         $this->authorize("create", Report::class);
 
-        $report = $this->reportService->create($request->validated());
+        $data = $request->validated();
+        $data['generated_by'] = $request->user()->id;
+        $data['company_id'] = $request->user()->company_id;
 
-        // TODO: generate report
-        // TODO: send report to user's mail
+        // Create report record
+        $report = $this->reportService->create($data);
 
-        return $this->created(
-            new ReportResource($report),
-            "Report successfully created"
-        );
+        try {
+            // Generate PDF file
+            $filePath = $this->reportService->generateReport($report);
+
+            // Return file download response
+            return response()->download(
+                Storage::path($filePath),
+                basename($filePath),
+                [
+                    'Content-Type' => 'application/pdf',
+                ]
+            )->deleteFileAfterSend(false); // Keep file for records
+
+        } catch (\Exception $e) {
+            \Log::error('Report generation failed', [
+                'report_id' => $report->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->error(
+                'Failed to generate report: ' . $e->getMessage(),
+                500
+            );
+        }
     }
 }

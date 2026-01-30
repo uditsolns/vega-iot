@@ -83,6 +83,7 @@ class AuditService
             str_contains($event, 'deactivated') => 'deactivated',
             str_contains($event, 'acknowledged') => 'acknowledged',
             str_contains($event, 'resolved') => 'resolved',
+            str_contains($event, 'generated') => 'generated',
             default => $event,
         };
 

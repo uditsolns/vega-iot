@@ -4,6 +4,7 @@ namespace App\Services\User;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Audit\AuditService;
 use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -11,6 +12,10 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class RoleService
 {
+    public function __construct(private AuditService $auditService)
+    {
+    }
+
     /**
      * Get paginated list of roles.
      *
@@ -59,6 +64,8 @@ class RoleService
             $role->permissions()->sync($data["permission_ids"]);
         }
 
+        $this->auditService->log("role.created", Role::class, $role);
+
         return $role->fresh(["permissions"]);
     }
 
@@ -84,6 +91,8 @@ class RoleService
             $role->permissions()->sync($data["permission_ids"]);
         }
 
+        $this->auditService->log("role.updated", Role::class, $role);
+
         return $role->fresh(["permissions"]);
     }
 
@@ -107,6 +116,8 @@ class RoleService
                 "Cannot delete role that is assigned to users.",
             );
         }
+
+        $this->auditService->log("role.deleted", Role::class, $role);
 
         $role->delete();
     }
@@ -137,6 +148,8 @@ class RoleService
             ->pluck("permissions.id")
             ->toArray();
         $newRole->permissions()->sync($permissionIds);
+
+        $this->auditService->log("role.created", Role::class, $newRole, ["permissions" => $permissionIds]);
 
         return $newRole->fresh(["permissions"]);
     }

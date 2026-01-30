@@ -24,7 +24,6 @@ class DeviceController extends Controller
 {
     public function __construct(
         private readonly DeviceService $deviceService,
-        private readonly DeviceInventoryService $inventoryService,
         private readonly ReadingQueryService $readingQueryService,
     ) {}
 
@@ -305,7 +304,7 @@ class DeviceController extends Controller
             );
         }
 
-        $stats = $this->inventoryService->getDeviceStats($user->company_id);
+        $stats = $this->deviceService->getDeviceStats($user->company_id);
 
         return $this->success($stats);
     }

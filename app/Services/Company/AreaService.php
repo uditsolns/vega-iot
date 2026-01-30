@@ -5,13 +5,16 @@ namespace App\Services\Company;
 use App\Models\Alert;
 use App\Models\Area;
 use App\Models\User;
+use App\Services\Audit\AuditService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class AreaService
+readonly class AreaService
 {
+    public function __construct(private AuditService $auditService) {}
+
     /**
      * Get paginated list of areas.
      *
@@ -42,7 +45,12 @@ class AreaService
      */
     public function create(array $data): Area
     {
-        return Area::create($data);
+        $area = Area::create($data);
+
+        // Audit log
+        $this->auditService->log("area.created", Area::class, $area);
+
+        return $area;
     }
 
     /**
@@ -56,6 +64,8 @@ class AreaService
     {
         $area->update($data);
 
+        $this->auditService->log("area.updated", Area::class, $area);
+
         return $area->fresh();
     }
 
@@ -68,6 +78,9 @@ class AreaService
     public function delete(Area $area): void
     {
         $area->delete();
+
+        // Audit log
+        $this->auditService->log("area.deleted", Area::class, $area);
     }
 
     /**
@@ -133,6 +146,9 @@ class AreaService
         $alertData = array_intersect_key($data, array_flip($alertFields));
 
         $area->update($alertData);
+
+        // Audit log
+        $this->auditService->log("area.alert_config_updated", Area::class, $area);
 
         return $area->fresh();
     }

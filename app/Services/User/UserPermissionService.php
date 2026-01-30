@@ -3,9 +3,15 @@
 namespace App\Services\User;
 
 use App\Models\User;
+use App\Services\Audit\AuditService;
+use Auth;
 
 class UserPermissionService
 {
+    public function __construct(private AuditService $auditService )
+    {
+    }
+
     /**
      * Grant a permission to a user.
      *
@@ -17,8 +23,15 @@ class UserPermissionService
     public function grantPermission(User $user, int $permissionId, ?int $grantedBy = null): void
     {
         $user->permissions()->syncWithoutDetaching([
-            $permissionId => ['granted_by' => $grantedBy],
+            $permissionId => ['granted_by' => $grantedBy or Auth::user()->id],
         ]);
+
+        $this->auditService->log(
+            "user.granted_permission",
+            User::class,
+            $user,
+            ["permission_id" => $permissionId]
+        );
     }
 
     /**
@@ -31,6 +44,13 @@ class UserPermissionService
     public function revokePermission(User $user, int $permissionId): void
     {
         $user->permissions()->detach($permissionId);
+
+        $this->auditService->log(
+            "user.revoked_permission",
+            User::class,
+            $user,
+            ["permission_id" => $permissionId]
+        );
     }
 
     /**

@@ -36,6 +36,7 @@ class DeviceConfigurationController extends Controller
 
     /**
      * Update device configuration (creates new config via transaction).
+     * @throws \Throwable
      */
     public function update(UpdateConfigurationRequest $request, Device $device): JsonResponse
     {

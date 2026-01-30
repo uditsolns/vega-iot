@@ -15,7 +15,7 @@ class ReportResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'file_type' => $this->file_type,
-            'report_format' => $this->report_format,
+            'format' => $this->format,
             'data_formation' => $this->data_formation,
             'interval' => $this->interval,
             'from_datetime' => $this->from_datetime,

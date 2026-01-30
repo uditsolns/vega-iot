@@ -95,6 +95,9 @@ readonly class CompanyService
     {
         $company->update(["is_active" => true]);
 
+        // Audit log
+        $this->auditService->log("company.activated", Company::class, $company);
+
         return $company->fresh();
     }
 
@@ -108,6 +111,9 @@ readonly class CompanyService
     {
         $company->update(["is_active" => false]);
 
+        // Audit log
+        $this->auditService->log("company.deactivated", Company::class, $company);
+
         return $company->fresh();
     }
 
@@ -120,6 +126,9 @@ readonly class CompanyService
     public function restore(Company $company): Company
     {
         $company->restore();
+
+        // Audit log
+        $this->auditService->log("company.restored", Company::class, $company);
 
         return $company->fresh();
     }

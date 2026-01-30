@@ -5,13 +5,15 @@ namespace App\Services\Company;
 use App\Models\Device;
 use App\Models\Location;
 use App\Models\User;
+use App\Services\Audit\AuditService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class LocationService
+readonly class LocationService
 {
+    public function __construct(private AuditService $auditService) {}
     /**
      * Get paginated list of locations.
      *
@@ -44,7 +46,12 @@ class LocationService
      */
     public function create(array $data): Location
     {
-        return Location::create($data);
+        $location = Location::create($data);
+
+        // Audit log
+        $this->auditService->log("location.created", Location::class, $location);
+
+        return $location;
     }
 
     /**
@@ -58,6 +65,9 @@ class LocationService
     {
         $location->update($data);
 
+        // Audit log
+        $this->auditService->log("location.updated", Location::class, $location);
+
         return $location->fresh();
     }
 
@@ -70,6 +80,9 @@ class LocationService
     public function delete(Location $location): void
     {
         $location->delete();
+
+        // Audit log
+        $this->auditService->log("location.deleted", Location::class, $location);
     }
 
     /**
@@ -81,6 +94,9 @@ class LocationService
     public function activate(Location $location): Location
     {
         $location->update(["is_active" => true]);
+
+        // Audit log
+        $this->auditService->log("location.activated", Location::class, $location);
 
         return $location->fresh();
     }
@@ -95,6 +111,9 @@ class LocationService
     {
         $location->update(["is_active" => false]);
 
+        // Audit log
+        $this->auditService->log("location.deactivated", Location::class, $location);
+
         return $location->fresh();
     }
 
@@ -107,6 +126,9 @@ class LocationService
     public function restore(Location $location): Location
     {
         $location->restore();
+
+        // Audit log
+        $this->auditService->log("location.restored", Location::class, $location);
 
         return $location->fresh();
     }

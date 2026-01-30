@@ -5,13 +5,18 @@ namespace App\Services\Device;
 use App\Models\Device;
 use App\Models\DeviceConfiguration;
 use App\Models\User;
+use App\Services\Audit\AuditService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-class DeviceConfigurationService
+readonly class DeviceConfigurationService
 {
+    public function __construct(private AuditService $auditService)
+    {
+    }
+
     /**
      * Get current configuration for a device
      */
@@ -57,12 +62,21 @@ class DeviceConfigurationService
                 ->update(["is_current" => false]);
 
             // Step 2: Create new configuration with is_current = true
-            return DeviceConfiguration::create([
+            $newConfig = DeviceConfiguration::create([
                 ...$data,
                 "device_id" => $device->id,
                 "is_current" => true,
                 "updated_by" => $user->id,
             ]);
+
+            $this->auditService->log(
+                "device_configuration.updated",
+                DeviceConfiguration::class,
+                $newConfig,
+                ['device_code' => $device->device_code]
+            );
+
+            return $newConfig;
         });
     }
 
