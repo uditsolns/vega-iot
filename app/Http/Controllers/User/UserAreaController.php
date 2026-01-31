@@ -60,20 +60,6 @@ class UserAreaController extends Controller
         return $this->success(null, "Area access revoked successfully");
     }
 
-    public function syncAreas(Request $request, User $user): JsonResponse
-    {
-        $this->authorize("assignAreas", $user);
-
-        $validated = $request->validate([
-            "area_ids" => ["required", "array"],
-            "area_ids.*" => ["required", "integer", "exists:areas,id"],
-        ]);
-
-        $this->areaAccessService->syncAccess($user, $validated["area_ids"]);
-
-        return $this->success(null, "Area access synchronized successfully");
-    }
-
     public function grantAreasByLocation(
         Request $request,
         User $user,

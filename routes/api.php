@@ -23,7 +23,6 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TicketCommentController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\User\UserAreaController;
-use App\Http\Controllers\User\UserBulkController;
 use App\Http\Controllers\User\UserController;
 use App\Http\Controllers\User\UserPermissionController;
 use Illuminate\Support\Facades\Route;
@@ -111,7 +110,6 @@ Route::prefix("v1")->group(function () {
             ->group(function () {
                 Route::get("/", "index");
                 Route::post("/", "grantAreas");
-                Route::put("/", "syncAreas");
                 Route::post("by-location", "grantAreasByLocation");
                 Route::post("by-hub", "grantAreasByHub");
                 Route::delete("clear", "clearAreas");
@@ -127,18 +125,6 @@ Route::prefix("v1")->group(function () {
                 Route::post("/", "syncPermissions");
                 Route::post("grant", "grantPermission");
                 Route::delete("{permission}", "revokePermission");
-            });
-
-        // Users - Bulk operations
-        Route::prefix("users/bulk")
-            ->controller(UserBulkController::class)
-            ->group(function () {
-                Route::post("activate", "bulkActivate");
-                Route::post("deactivate", "bulkDeactivate");
-                Route::post("delete", "bulkDelete");
-                Route::post("role", "bulkChangeRole");
-                Route::post("grant-areas", "bulkGrantAreas");
-                Route::post("revoke-areas", "bulkRevokeAreas");
             });
 
         // Roles

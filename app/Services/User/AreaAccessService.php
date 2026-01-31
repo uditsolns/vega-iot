@@ -71,26 +71,6 @@ class AreaAccessService
     }
 
     /**
-     * Sync user area access (replace all).
-     *
-     * @param User $user
-     * @param array $areaIds
-     * @return void
-     */
-    public function syncAccess(
-        User $user,
-        array $areaIds,
-    ): void {
-        // Delete all existing access
-        UserAreaAccess::where("user_id", $user->id)->delete();
-
-        // Grant new access
-        foreach ($areaIds as $areaId) {
-            $this->grantAccess($user, $areaId);
-        }
-    }
-
-    /**
      * Grant access to all areas in a location.
      *
      * @param User $user
@@ -153,77 +133,5 @@ class AreaAccessService
     public function clearAll(User $user): void
     {
         UserAreaAccess::where("user_id", $user->id)->delete();
-    }
-
-    /**
-     * Bulk grant area access to multiple users.
-     *
-     * @param array $userIds
-     * @param array $areaIds
-     * @param int|null $grantedBy
-     * @return array
-     */
-    public function bulkGrantAreas(
-        array $userIds,
-        array $areaIds,
-        ?int $grantedBy = null,
-    ): array {
-        $users = User::whereIn("id", $userIds)->get();
-        $successCount = 0;
-        $failures = [];
-
-        foreach ($users as $user) {
-            try {
-                foreach ($areaIds as $areaId) {
-                    $this->grantAccess($user, $areaId, $grantedBy);
-                }
-                $successCount++;
-            } catch (Exception $e) {
-                $failures[] = [
-                    "id" => $user->id,
-                    "error" => $e->getMessage(),
-                ];
-            }
-        }
-
-        return [
-            "success_count" => $successCount,
-            "failed_count" => count($failures),
-            "failures" => $failures,
-        ];
-    }
-
-    /**
-     * Bulk revoke area access from multiple users.
-     *
-     * @param array $userIds
-     * @param array $areaIds
-     * @return array
-     */
-    public function bulkRevokeAreas(array $userIds, array $areaIds): array
-    {
-        $users = User::whereIn("id", $userIds)->get();
-        $successCount = 0;
-        $failures = [];
-
-        foreach ($users as $user) {
-            try {
-                foreach ($areaIds as $areaId) {
-                    $this->revokeAccess($user, $areaId);
-                }
-                $successCount++;
-            } catch (Exception $e) {
-                $failures[] = [
-                    "id" => $user->id,
-                    "error" => $e->getMessage(),
-                ];
-            }
-        }
-
-        return [
-            "success_count" => $successCount,
-            "failed_count" => count($failures),
-            "failures" => $failures,
-        ];
     }
 }
