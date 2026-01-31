@@ -8,6 +8,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\ProfileController;
+use App\Http\Controllers\CalibrationInstrumentController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Device\DeviceBulkController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\User\UserAreaController;
 use App\Http\Controllers\User\UserController;
 use App\Http\Controllers\User\UserPermissionController;
+use App\Http\Controllers\ValidationStudyController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix("v1")->group(function () {
@@ -308,5 +310,11 @@ Route::prefix("v1")->group(function () {
                 Route::get("/", "index");
                 Route::post("/", "store");
         });
+
+        // Instruments
+        Route::apiResource("calibration-instruments", CalibrationInstrumentController::class);
+
+        // Studies
+        Route::apiResource("validation-studies", ValidationStudyController::class);
     });
 });
