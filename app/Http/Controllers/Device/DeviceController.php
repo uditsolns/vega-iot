@@ -200,7 +200,7 @@ class DeviceController extends Controller
      */
     public function unassign(Device $device): JsonResponse
     {
-        $this->authorize("assignCompany", $device);
+        $this->authorize("assign-to-company", $device);
 
         $device = $this->deviceService->unassign($device);
 

@@ -3,16 +3,16 @@
 namespace App\Services\Company;
 
 use App\Models\CalibrationInstrument;
+use App\Models\Company;
 use App\Models\User;
-use App\Services\Audit\AuditService;
+use Auth;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Validation\UnauthorizedException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class CalibrationInstrumentService
 {
-    public function __construct(private AuditService $auditService) {}
-
     public function list(array $filters, User $user): LengthAwarePaginator
     {
         return QueryBuilder::for(
@@ -31,28 +31,18 @@ readonly class CalibrationInstrumentService
 
     public function create(array $data): CalibrationInstrument
     {
-        $instrument = CalibrationInstrument::create($data);
+        $company = Company::find($data['company_id']);
+        $user = Auth::user();
 
-        $this->auditService->log(
-            'calibration_instrument.created',
-            CalibrationInstrument::class,
-            $instrument
-        );
+        if (isset($user->company_id) && ($company->id !== $user->company_id)) {
+            throw new UnauthorizedException("Company doesn't belong to you");
+        }
 
-        return $instrument;
+        return CalibrationInstrument::create($data);
     }
 
-    public function update(
-        CalibrationInstrument $instrument,
-        array $data
-    ): CalibrationInstrument {
+    public function update(CalibrationInstrument $instrument, array $data): CalibrationInstrument {
         $instrument->update($data);
-
-        $this->auditService->log(
-            'calibration_instrument.updated',
-            CalibrationInstrument::class,
-            $instrument
-        );
 
         return $instrument->fresh();
     }
@@ -60,11 +50,5 @@ readonly class CalibrationInstrumentService
     public function delete(CalibrationInstrument $instrument): void
     {
         $instrument->delete();
-
-        $this->auditService->log(
-            'calibration_instrument.deleted',
-            CalibrationInstrument::class,
-            $instrument
-        );
     }
 }

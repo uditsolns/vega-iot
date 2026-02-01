@@ -3,7 +3,6 @@
 namespace App\Services\User;
 
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 

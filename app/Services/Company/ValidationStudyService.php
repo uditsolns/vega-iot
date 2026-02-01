@@ -2,17 +2,17 @@
 
 namespace App\Services\Company;
 
+use App\Models\Company;
 use App\Models\ValidationStudy;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\UnauthorizedException;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
 
 readonly class ValidationStudyService
 {
-    public function __construct(private AuditService $auditService) {}
-
     public function list(array $filters, User $user): LengthAwarePaginator
     {
         return QueryBuilder::for(
@@ -35,28 +35,19 @@ readonly class ValidationStudyService
 
     public function create(array $data): ValidationStudy
     {
-        $study = ValidationStudy::create($data);
+        $company = Company::find($data['company_id']);
+        $user = Auth::user();
 
-        $this->auditService->log(
-            'validation_study.created',
-            ValidationStudy::class,
-            $study
-        );
+        if (isset($user->company_id) && ($company->id !== $user->company_id)) {
+            throw new UnauthorizedException("Company doesn't belong to you");
+        }
 
-        return $study;
+        return ValidationStudy::create($data);
+
     }
 
-    public function update(
-        ValidationStudy $study,
-        array $data
-    ): ValidationStudy {
+    public function update(ValidationStudy $study, array $data): ValidationStudy {
         $study->update($data);
-
-        $this->auditService->log(
-            'validation_study.updated',
-            ValidationStudy::class,
-            $study
-        );
 
         return $study->fresh();
     }
@@ -64,11 +55,5 @@ readonly class ValidationStudyService
     public function delete(ValidationStudy $study): void
     {
         $study->delete();
-
-        $this->auditService->log(
-            'validation_study.deleted',
-            ValidationStudy::class,
-            $study
-        );
     }
 }

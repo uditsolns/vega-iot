@@ -5,9 +5,9 @@ namespace App\Services\Device;
 use App\Enums\DeviceStatus;
 use App\Exceptions\DeviceAssignmentException;
 use App\Models\Area;
+use App\Models\Company;
 use App\Models\Device;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
@@ -17,10 +17,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class DeviceService
 {
-    public function __construct(
-        private DeviceConfigurationService $configService,
-        private AuditService $auditService,
-    ) {}
+    public function __construct(private DeviceConfigurationService $configService) {}
 
     /**
      * List devices with filtering, sorting, and includes
@@ -69,9 +66,6 @@ readonly class DeviceService
         // Generate default configuration
         $this->configService->createDefault($device);
 
-        // Audit log
-        $this->auditService->log("device.created", Device::class, $device);
-
         return $device->fresh(["currentConfiguration"]);
     }
 
@@ -82,9 +76,6 @@ readonly class DeviceService
     {
         $device->update($data);
 
-        // Audit log
-        $this->auditService->log("device.updated", Device::class, $device);
-
         return $device->fresh(["currentConfiguration", "company", "area"]);
     }
 
@@ -94,9 +85,6 @@ readonly class DeviceService
     public function delete(Device $device): void
     {
         $device->update(["is_active" => false]);
-
-        // Audit log
-        $this->auditService->log("device.deleted", Device::class, $device);
     }
 
     /**
@@ -111,7 +99,16 @@ readonly class DeviceService
             throw new InvalidArgumentException("Invalid status: $status");
         }
 
+        $oldStatus = $device->status;
+
         $device->update(["status" => $statusEnum]);
+
+        activity("device")
+            ->event("changed_status")
+            ->performedOn($device)
+            ->withProperties(["device_id" => $device->id])
+            ->log("Changed status from \"$oldStatus->value\" to \"$statusEnum->value\" for device \"$device->device_code\"");
+
         return $device->fresh();
     }
 
@@ -141,6 +138,8 @@ readonly class DeviceService
      */
     public function assignToCompany(Device $device, array $data): Device
     {
+        $company = Company::find($data['company_id']);
+
         $updateData = [
             "company_id" => $data["company_id"],
             "area_id" => null, // Unassign from area when assigning to company
@@ -153,17 +152,19 @@ readonly class DeviceService
         $device->update($updateData);
 
         // Audit log
-        $this->auditService->log(
-            "device.assigned_company",
-            Device::class,
-            $device,
-        );
+        activity("device")
+            ->event('assigned_to_company')
+            ->performedOn($device)
+            ->withProperties([
+                'device_id' => $device->id,
+                'company_id' => $company->id,
+            ])
+            ->log("Assigned device \"{$device->device_code}\" to company \"{$company->name}\"");
 
         return $device->fresh(["company"]);
     }
 
     /**
-     * Assign device to area (deploy)
      * @throws DeviceAssignmentException
      */
     public function assignToArea(Device $device, array $data): Device
@@ -194,11 +195,14 @@ readonly class DeviceService
         $device->update($updateData);
 
         // Audit log
-        $this->auditService->log(
-            "device.assigned_area",
-            Device::class,
-            $device,
-        );
+        activity("device")
+            ->event('assigned_to_area')
+            ->performedOn($device)
+            ->withProperties([
+                'device_id' => $device->id,
+                'area_id' => $area->id,
+            ])
+            ->log("Assigned device \"{$device->device_code}\" to area \"{$area->name}\"");
 
         return $device->fresh(["company", "area.hub.location"]);
     }
@@ -215,7 +219,11 @@ readonly class DeviceService
         ]);
 
         // Audit log
-        $this->auditService->log("device.unassigned", Device::class, $device);
+        activity('device')
+            ->event('unassigned')
+            ->performedOn($device)
+            ->withProperties(['device_id' => $device->id])
+            ->log("Unassigned device \"{$device->device_code}\"");
 
         return $device->fresh();
     }
@@ -246,13 +254,17 @@ readonly class DeviceService
             "area_id" => null, // Unassign from area when assigning to company
         ]);
 
+        $company = Company::find($companyId);
+
         // Audit log for bulk operation
-        $this->auditService->log(
-            "device.bulk_assigned_to_company",
-            Device::class,
-            null,
-            ["device_ids" => $deviceIds, "company_id" => $companyId],
-        );
+        activity("device")
+            ->event("bulk_assigned_to_company")
+            ->withProperties([
+                "company_id" => $company->id,
+                "device_ids" => $deviceIds,
+                "device_count" => count($deviceIds),
+            ])
+            ->log("Bulk assigned " . count($deviceIds) . " devices to company \"{$company->name}\"");
     }
 
     /**
@@ -272,9 +284,7 @@ readonly class DeviceService
         foreach ($devices as $device) {
             // Use policy method for authorization (includes area restriction check)
             if (!$user->can("assignToArea", [$device, $areaId])) {
-                throw new AuthorizationException(
-                    "Unauthorized to assign device $device->device_code to this area.",
-                );
+                throw new AuthorizationException("Unauthorized to assign device $device->device_code to this area.");
             }
 
             // Validate device has a company assignment
@@ -284,10 +294,7 @@ readonly class DeviceService
 
             // Validate area belongs to same company as device
             if ($area->hub->location->company_id !== $device->company_id) {
-                throw DeviceAssignmentException::areaMismatch(
-                    $device->device_code,
-                    $area->name,
-                );
+                throw DeviceAssignmentException::areaMismatch($device->device_code, $area->name);
             }
         }
 
@@ -297,12 +304,14 @@ readonly class DeviceService
         ]);
 
         // Audit log for bulk operation
-        $this->auditService->log(
-            "device.bulk_assigned_to_area",
-            Device::class,
-            null,
-            ["device_ids" => $deviceIds, "area_id" => $areaId],
-        );
+        activity("device")
+            ->event('bulk_assigned_to_area')
+            ->withProperties([
+                'area_id' => $area->id,
+                'device_ids' => $deviceIds,
+                'device_count' => count($deviceIds),
+            ])
+            ->log("Bulk assigned " . count($deviceIds) . " devices to area \"{$area->name}\"");
     }
 
     /**
@@ -330,12 +339,13 @@ readonly class DeviceService
         ]);
 
         // Audit log for bulk operation
-        $this->auditService->log(
-            "device.bulk_unassigned",
-            Device::class,
-            null,
-            ["device_ids" => $deviceIds],
-        );
+        activity("device")
+            ->event('bulk_unassigned')
+            ->withProperties([
+                'device_ids' => $deviceIds,
+                'device_count' => count($deviceIds)
+            ])
+            ->log("Bulk unassigned " . count($deviceIds) . " devices");
     }
 
     /**
@@ -359,9 +369,7 @@ readonly class DeviceService
         // Authorize all devices
         foreach ($devices as $device) {
             if (!$user->can("update", $device)) {
-                throw new AuthorizationException(
-                    "Unauthorized to update device $device->device_code.",
-                );
+                throw new AuthorizationException("Unauthorized to update device $device->device_code.");
             }
         }
 
@@ -371,12 +379,14 @@ readonly class DeviceService
         ]);
 
         // Audit log for bulk operation
-        $this->auditService->log(
-            "device.bulk_status_changed",
-            Device::class,
-            null,
-            ["device_ids" => $deviceIds, "status" => $status],
-        );
+        activity("device")
+            ->event('bulk_status_changed')
+            ->withProperties([
+                'new_status' => $status,
+                'device_ids' => $deviceIds,
+                'device_count' => count($deviceIds),
+            ])
+            ->log("Bulk changed status to \"{$status}\" for " . count($deviceIds) . " devices");
     }
 
     /**
@@ -402,9 +412,13 @@ readonly class DeviceService
         ]);
 
         // Audit log for bulk operation
-        $this->auditService->log("device.bulk_deleted", Device::class, null, [
-            "device_ids" => $deviceIds,
-        ]);
+        activity("device")
+            ->event('bulk_deleted')
+            ->withProperties([
+                'device_ids' => $deviceIds,
+                'device_count' => count($deviceIds)
+            ])
+            ->log("Bulk deleted " . count($deviceIds) . " devices");
     }
 
     /**

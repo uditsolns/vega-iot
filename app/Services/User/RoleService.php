@@ -4,7 +4,6 @@ namespace App\Services\User;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -12,16 +11,9 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class RoleService
 {
-    public function __construct(private AuditService $auditService)
-    {
-    }
 
     /**
      * Get paginated list of roles.
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -50,9 +42,6 @@ class RoleService
 
     /**
      * Create a new role.
-     *
-     * @param array $data
-     * @return Role
      */
     public function create(array $data): Role
     {
@@ -64,18 +53,11 @@ class RoleService
             $role->permissions()->sync($data["permission_ids"]);
         }
 
-        $this->auditService->log("role.created", Role::class, $role);
-
         return $role->fresh(["permissions"]);
     }
 
     /**
      * Update a role.
-     *
-     * @param Role $role
-     * @param array $data
-     * @return Role
-     * @throws Exception
      */
     public function update(Role $role, array $data): Role
     {
@@ -91,17 +73,11 @@ class RoleService
             $role->permissions()->sync($data["permission_ids"]);
         }
 
-        $this->auditService->log("role.updated", Role::class, $role);
-
         return $role->fresh(["permissions"]);
     }
 
     /**
      * Delete a role.
-     *
-     * @param Role $role
-     * @return void
-     * @throws Exception
      */
     public function delete(Role $role): void
     {
@@ -117,17 +93,11 @@ class RoleService
             );
         }
 
-        $this->auditService->log("role.deleted", Role::class, $role);
-
         $role->delete();
     }
 
     /**
      * Clone a role with new name.
-     *
-     * @param Role $role
-     * @param array $data
-     * @return Role
      */
     public function clone(Role $role, array $data): Role
     {
@@ -149,7 +119,13 @@ class RoleService
             ->toArray();
         $newRole->permissions()->sync($permissionIds);
 
-        $this->auditService->log("role.created", Role::class, $newRole, ["permissions" => $permissionIds]);
+        activity('role')
+            ->event("cloned")
+            ->withProperties([
+                "source_role_id" => $role->id,
+                "new_role_id" => $newRole->id,
+            ])
+            ->log("Cloned role \"{$role->name}\" to \"{$newRole->name}\"");
 
         return $newRole->fresh(["permissions"]);
     }

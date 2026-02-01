@@ -49,15 +49,6 @@ class DevicePolicy
             return false;
         }
 
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        // Device must be in user's company
-        if ($device->company_id !== $user->company_id) {
-            return false;
-        }
-
         return $this->userCanAccessDevice($user, $device);
     }
 

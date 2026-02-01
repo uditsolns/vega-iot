@@ -7,7 +7,6 @@ use App\Models\Alert;
 use App\Models\Area;
 use App\Models\Location;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -17,16 +16,9 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class AlertService
 {
-    public function __construct(
-        private AuditService $auditService,
-    ) {}
 
     /**
      * List alerts with filtering, sorting, and includes
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -64,10 +56,6 @@ readonly class AlertService
 
     /**
      * Get alert statistics for a user
-     *
-     * @param User $user
-     * @param int|null $days Number of days to analyze (default 7)
-     * @return array
      */
     public function getStatistics(User $user, ?int $days = 7): array
     {
@@ -154,11 +142,6 @@ readonly class AlertService
 
     /**
      * Acknowledge an alert
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param string|null $comment
-     * @return Alert
      */
     public function acknowledge(
         Alert $alert,
@@ -172,7 +155,14 @@ readonly class AlertService
         }
 
         // Audit log
-        $this->auditService->log("alert.acknowledged", Alert::class, $alert);
+        activity("alert")
+            ->performedOn($alert)
+            ->event('acknowledged')
+            ->withProperties([
+                'device_id' => $alert->device->id,
+                'alert_id' => $alert->id,
+            ])
+            ->log("Acknowledged {$alert->severity->value} alert for device \"{$alert->device->device_code}\"");
 
         // TODO: Send "alert acknowledged" notification
 
@@ -181,11 +171,6 @@ readonly class AlertService
 
     /**
      * Resolve an alert
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param string|null $comment
-     * @return Alert
      */
     public function resolve(
         Alert $alert,
@@ -199,7 +184,14 @@ readonly class AlertService
         }
 
         // Audit log
-        $this->auditService->log("alert.resolved", Alert::class, $alert);
+        activity("alert")
+            ->performedOn($alert)
+            ->event('resolved')
+            ->withProperties([
+                'device_id' => $alert->device->id,
+                'alert_id' => $alert->id,
+            ])
+            ->log("Resolved {$alert->severity->value} alert for device \"{$alert->device->device_code}\"");
 
         // TODO: Send "alert resolved" notification
 
@@ -208,9 +200,6 @@ readonly class AlertService
 
     /**
      * Get alert details with full relationships
-     *
-     * @param Alert $alert
-     * @return Alert
      */
     public function show(Alert $alert): Alert
     {
@@ -219,9 +208,6 @@ readonly class AlertService
 
     /**
      * Get notifications for an alert
-     *
-     * @param Alert $alert
-     * @return Collection
      */
     public function getNotifications(Alert $alert): Collection
     {
@@ -234,11 +220,6 @@ readonly class AlertService
 
     /**
      * List alerts for devices in a specific area
-     *
-     * @param Area $area
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function listForArea(
         Area $area,
@@ -289,11 +270,6 @@ readonly class AlertService
 
     /**
      * List alerts for devices in a specific location
-     *
-     * @param Location $location
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function listForLocation(
         Location $location,
@@ -356,11 +332,6 @@ readonly class AlertService
 
     /**
      * Get recent alerts for a device
-     *
-     * @param int $deviceId
-     * @param User $user
-     * @param int $limit
-     * @return Collection
      */
     public function getDeviceAlerts(
         int $deviceId,

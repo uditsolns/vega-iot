@@ -12,10 +12,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Device extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         "device_uid",
@@ -40,6 +43,22 @@ class Device extends Model
     ];
 
     protected $hidden = ["api_key"];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logFillable()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->dontLogIfAttributesChangedOnly(['company_id', 'area_id', 'device_name',  'last_reading_at', 'status', 'updated_at', 'api_key'])
+            ->useLogName('device')
+            ->setDescriptionForEvent(fn($event) => ucfirst("$event device \"$this->device_code\""));
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $activity->properties = $activity->properties->put('device_code', $this->device_code);
+    }
 
     protected function casts(): array
     {

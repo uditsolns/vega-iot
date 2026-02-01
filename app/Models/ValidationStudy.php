@@ -6,6 +6,8 @@ use App\Enums\ValidationQualificationType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 
 class ValidationStudy extends Model
 {
@@ -25,6 +27,17 @@ class ValidationStudy extends Model
         'mapping_due_at',
         'report_path',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logFillable()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->dontLogIfAttributesChangedOnly(["updated_at"])
+            ->useLogName('area')
+            ->setDescriptionForEvent(fn($event) => ucfirst("$event validation study"));
+    }
 
     protected function casts(): array
     {

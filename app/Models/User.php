@@ -13,10 +13,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, LogsActivity;
 
     /**
      * The attributes that are mass assignable.
@@ -59,6 +62,24 @@ class User extends Authenticatable
             "last_login_at" => "datetime",
             "deleted_at" => "datetime",
         ];
+    }
+
+    /**
+     * Get activity log options
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['email', 'first_name', 'last_name', 'phone', 'work_mode'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName("user")
+            ->setDescriptionForEvent(fn($event) => ucfirst("{$event} user \"$this->email\""));
+    }
+
+    public function tapActivity(Activity $activity, string $eventName): void
+    {
+        $activity->properties = $activity->properties->put('email', $this->email);
     }
 
     /**

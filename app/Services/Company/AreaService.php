@@ -4,23 +4,20 @@ namespace App\Services\Company;
 
 use App\Models\Alert;
 use App\Models\Area;
+use App\Models\Hub;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\UnauthorizedException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class AreaService
 {
-    public function __construct(private AuditService $auditService) {}
 
     /**
      * Get paginated list of areas.
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -39,95 +36,87 @@ readonly class AreaService
 
     /**
      * Create a new area.
-     *
-     * @param array $data
-     * @return Area
      */
     public function create(array $data): Area
     {
-        $area = Area::create($data);
+        $hub = Hub::with('location')->findOrFail($data['hub_id']);
+        $user = Auth::user();
 
-        // Audit log
-        $this->auditService->log("area.created", Area::class, $area);
+        if (isset($user->company_id) && ($hub->location->company_id != $user->company_id)) {
+            throw new UnauthorizedException("Provided hub doesn't belong to you.");
+        }
 
-        return $area;
+        return Area::create($data);
     }
 
     /**
      * Update an area.
-     *
-     * @param Area $area
-     * @param array $data
-     * @return Area
      */
     public function update(Area $area, array $data): Area
     {
         $area->update($data);
-
-        $this->auditService->log("area.updated", Area::class, $area);
 
         return $area->fresh();
     }
 
     /**
      * Delete an area (soft delete).
-     *
-     * @param Area $area
-     * @return void
      */
     public function delete(Area $area): void
     {
         $area->delete();
-
-        // Audit log
-        $this->auditService->log("area.deleted", Area::class, $area);
     }
 
     /**
      * Activate an area.
-     *
-     * @param Area $area
-     * @return Area
      */
     public function activate(Area $area): Area
     {
         $area->update(["is_active" => true]);
+
+        activity('area')
+            ->performedOn($area)
+            ->event('activated')
+            ->withProperties(['area_id' => $area->id])
+            ->log("Activated area \"{$area->name}\"");
 
         return $area->fresh();
     }
 
     /**
      * Deactivate an area.
-     *
-     * @param Area $area
-     * @return Area
      */
     public function deactivate(Area $area): Area
     {
         $area->update(["is_active" => false]);
+
+        activity('area')
+            ->performedOn($area)
+            ->event('deactivated')
+            ->withProperties(['area_id' => $area->id])
+            ->log("Deactivated area \"{$area->name}\"");
 
         return $area->fresh();
     }
 
     /**
      * Restore a soft-deleted area.
-     *
-     * @param Area $area
-     * @return Area
      */
     public function restore(Area $area): Area
     {
         $area->restore();
+
+        activity('area')
+            ->performedOn($area)
+            ->event('restored')
+            ->withProperties(['area_id' => $area->id])
+            ->log("Restored area \"{$area->name}\"");
 
         return $area->fresh();
     }
 
     /**
      * Update alert configuration for an area.
-     *
-     * @param Area $area
-     * @param array $data
-     * @return Area
      */
     public function updateAlertConfig(Area $area, array $data): Area
     {
@@ -148,17 +137,18 @@ readonly class AreaService
         $area->update($alertData);
 
         // Audit log
-        $this->auditService->log("area.alert_config_updated", Area::class, $area);
+        // TODO:  include updated context
+        activity('area')
+            ->event('alert_configuration_updated')
+            ->performedOn($area)
+            ->withProperties(['area_id' => $area->id])
+            ->log("Updated alert configuration for area \"{$area->name}\"");
 
         return $area->fresh();
     }
 
     /**
      * Copy alert configuration from source area to target areas.
-     *
-     * @param Area $sourceArea
-     * @param array $targetAreaIds
-     * @return array
      */
     public function copyAlertConfig(
         Area $sourceArea,
@@ -186,14 +176,21 @@ readonly class AreaService
             $targetArea = Area::find($areaId);
 
             if (!$targetArea) {
-                $failed[] = [
-                    "id" => $areaId,
-                    "reason" => "Area not found",
-                ];
+                $failed[] = ['id' => $areaId, 'reason' => "Area not found"];
                 continue;
             }
 
             $targetArea->update($alertConfig);
+
+            activity('area')
+                ->event('alert_configuration_copied')
+                ->performedOn($targetArea)
+                ->withProperties([
+                    'source_area_id' => $sourceArea->id,
+                    'target_area_id' => $targetArea->id,
+                ])
+                ->log("Copied alert configuration from \"{$sourceArea->name}\" to \"{$targetArea->name}\"");
+
             $updated[] = $targetArea->id;
         }
 
@@ -205,10 +202,6 @@ readonly class AreaService
 
     /**
      * Get devices for an area.
-     *
-     * @param Area $area
-     * @param User $user
-     * @return Collection
      */
     public function getDevices(
         Area $area,
@@ -223,9 +216,6 @@ readonly class AreaService
 
     /**
      * Get statistics for an area.
-     *
-     * @param Area $area
-     * @return array
      */
     public function getStats(Area $area): array
     {

@@ -4,22 +4,19 @@ namespace App\Services\Company;
 
 use App\Models\Device;
 use App\Models\Hub;
+use App\Models\Location;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\UnauthorizedException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class HubService
 {
-    public function __construct(private AuditService $auditService) {}
     /**
      * Get paginated list of hubs.
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -38,79 +35,67 @@ readonly class HubService
 
     /**
      * Create a new hub.
-     *
-     * @param array $data
-     * @return Hub
      */
     public function create(array $data): Hub
     {
-        $hub = Hub::create($data);
+        $location = Location::find($data['location_id']);
+        $user = Auth::user();
 
-        // Audit log
-        $this->auditService->log("hub.created", Hub::class, $hub);
+        if (isset($user->company_id) && ($location->company_id != $user->company_id)) {
+            throw new UnauthorizedException("Provided location doesn't belong to you.");
+        }
 
-        return $hub;
+        return Hub::create($data);
     }
 
     /**
      * Update a hub.
-     *
-     * @param Hub $hub
-     * @param array $data
-     * @return Hub
      */
     public function update(Hub $hub, array $data): Hub
     {
         $hub->update($data);
-
-        // Audit log
-        $this->auditService->log("hub.updated", Hub::class, $hub);
 
         return $hub->fresh();
     }
 
     /**
      * Delete a hub (soft delete).
-     *
-     * @param Hub $hub
-     * @return void
      */
     public function delete(Hub $hub): void
     {
         $hub->delete();
-
-        // Audit log
-        $this->auditService->log("hub.deleted", Hub::class, $hub);
     }
 
     /**
      * Activate a hub.
-     *
-     * @param Hub $hub
-     * @return Hub
      */
     public function activate(Hub $hub): Hub
     {
         $hub->update(["is_active" => true]);
 
         // Audit log
-        $this->auditService->log("hub.activated", Hub::class, $hub);
+        activity('hub')
+            ->event('activated')
+            ->performedOn($hub)
+            ->withProperties(['hub_id' => $hub->id])
+            ->log("Activated hub \"{$hub->name}\"");
 
         return $hub->fresh();
     }
 
     /**
      * Deactivate a hub.
-     *
-     * @param Hub $hub
-     * @return Hub
      */
     public function deactivate(Hub $hub): Hub
     {
         $hub->update(["is_active" => false]);
 
         // Audit log
-        $this->auditService->log("hub.deactivated", Hub::class, $hub);
+        activity('hub')
+            ->event('deactivated')
+            ->performedOn($hub)
+            ->withProperties(['hub_id' => $hub->id])
+            ->log("Deactivated hub \"{$hub->name}\"");
 
         return $hub->fresh();
     }
@@ -126,17 +111,17 @@ readonly class HubService
         $hub->restore();
 
         // Audit log
-        $this->auditService->log("hub.restored", Hub::class, $hub);
+        activity('hub')
+            ->event('restored')
+            ->performedOn($hub)
+            ->withProperties(['hub_id' => $hub->id])
+            ->log("Restored hub \"{$hub->name}\"");
 
         return $hub->fresh();
     }
 
     /**
      * Get devices for a hub.
-     *
-     * @param Hub $hub
-     * @param User $user
-     * @return Collection
      */
     public function getDevices(
         Hub $hub,
@@ -154,9 +139,6 @@ readonly class HubService
 
     /**
      * Get statistics for a hub.
-     *
-     * @param Hub $hub
-     * @return array
      */
     public function getStats(Hub $hub): array
     {

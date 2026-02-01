@@ -4,7 +4,7 @@ namespace App\Services\Report;
 
 use App\Models\Report;
 use App\Models\User;
-use App\Services\Audit\AuditService;
+use App\Services\Audit\ActivityLogger;
 use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -12,10 +12,7 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class ReportService
 {
-    public function __construct(
-        private AuditService $auditService,
-        private ReportGeneratorService $reportGenerator
-    ) {}
+    public function __construct(private ReportGeneratorService $reportGenerator) {}
 
     /**
      * Get paginated list of reports.
@@ -59,7 +56,7 @@ readonly class ReportService
         $report = Report::create($data);
 
         // Audit log
-        $this->auditService->log("report.generated", Report::class, $report);
+        ActivityLogger::logAction($report, "generated");
 
         return $report;
     }

@@ -2,23 +2,15 @@
 
 namespace App\Services\User;
 
+use App\Models\Permission;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Auth;
 
 class UserPermissionService
 {
-    public function __construct(private AuditService $auditService )
-    {
-    }
 
     /**
      * Grant a permission to a user.
-     *
-     * @param User $user
-     * @param int $permissionId
-     * @param int|null $grantedBy
-     * @return void
      */
     public function grantPermission(User $user, int $permissionId, ?int $grantedBy = null): void
     {
@@ -26,40 +18,38 @@ class UserPermissionService
             $permissionId => ['granted_by' => $grantedBy or Auth::user()->id],
         ]);
 
-        $this->auditService->log(
-            "user.granted_permission",
-            User::class,
-            $user,
-            ["permission_id" => $permissionId]
-        );
+        $permission = Permission::find($permissionId);
+
+        activity("user")
+            ->event("granted_permission")
+            ->performedOn($user)
+            ->withProperties([
+                "user_id" => $user->id,
+                "permission_id" => $permission->id,
+            ])
+            ->log("Granted permission \"{$permission->name}\" to user \"{$user->email}\"");
     }
 
     /**
      * Revoke a permission from a user.
-     *
-     * @param User $user
-     * @param int $permissionId
-     * @return void
      */
     public function revokePermission(User $user, int $permissionId): void
     {
+        $permission = Permission::find($permissionId);
         $user->permissions()->detach($permissionId);
 
-        $this->auditService->log(
-            "user.revoked_permission",
-            User::class,
-            $user,
-            ["permission_id" => $permissionId]
-        );
+        activity("user")
+            ->event("revoked_permission")
+            ->performedOn($user)
+            ->withProperties([
+                "user_id" => $user->id,
+                "permission_id" => $permission->id,
+            ])
+            ->log("Revoked permission \"{$permission->name}\" to user \"{$user->email}\"");
     }
 
     /**
      * Sync user permissions (replace all).
-     *
-     * @param User $user
-     * @param array $permissionIds
-     * @param int|null $grantedBy
-     * @return void
      */
     public function syncPermissions(User $user, array $permissionIds, ?int $grantedBy = null): void
     {

@@ -16,17 +16,17 @@ class AuthenticateDevice
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Extract device ID from request body (field: 'ID')
-        $deviceId = $request->input('ID');
-
-        if (!$deviceId) {
-            return response()->json([
-                'message' => 'Device ID (ID field) is required',
-            ], 401);
-        }
+//        // Extract device ID from request body (field: 'ID')
+//        $deviceId = $request->input('ID');
+//
+//        if (!$deviceId) {
+//            return response()->json([
+//                'message' => 'Device ID (ID field) is required',
+//            ], 401);
+//        }
 
         // Query devices table for matching device_uid
-        $device = Device::where('device_uid', $deviceId)
+        $device = Device::where('api_key', $request->bearerToken())
             ->with(['area.hub.location', 'company'])
             ->first();
 

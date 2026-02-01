@@ -19,7 +19,7 @@ class IngestReadingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ID' => 'required|string',
+//            'ID' => 'required|string',
             'recorded_at' => 'required|date_format:Y-m-d H:i:s',
             'temperature' => 'nullable|numeric|between:-100,200',
             'humidity' => 'nullable|numeric|between:0,100',

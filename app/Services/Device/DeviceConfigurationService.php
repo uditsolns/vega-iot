@@ -5,7 +5,7 @@ namespace App\Services\Device;
 use App\Models\Device;
 use App\Models\DeviceConfiguration;
 use App\Models\User;
-use App\Services\Audit\AuditService;
+use App\Services\Audit\ActivityLogger;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,9 +13,6 @@ use Throwable;
 
 readonly class DeviceConfigurationService
 {
-    public function __construct(private AuditService $auditService)
-    {
-    }
 
     /**
      * Get current configuration for a device
@@ -69,12 +66,10 @@ readonly class DeviceConfigurationService
                 "updated_by" => $user->id,
             ]);
 
-            $this->auditService->log(
-                "device_configuration.updated",
-                DeviceConfiguration::class,
-                $newConfig,
-                ['device_code' => $device->device_code]
-            );
+            activity("device")
+                ->event("configuration_updated")
+                ->withProperties(["device_id" => $device->id])
+                ->log("Updated configuration for device \"{$device->device_code}\"");
 
             return $newConfig;
         });
@@ -122,6 +117,14 @@ readonly class DeviceConfigurationService
             }
 
             DeviceConfiguration::insert($newConfigs);
+
+            activity("device")
+                ->event('bulk_configuration_updated')
+                ->withProperties([
+                    'device_ids' => $deviceIds,
+                    'device_count' => count($deviceIds)
+                ])
+                ->log("Bulk updated configuration for " . count($deviceIds) . " devices");
         });
     }
 }

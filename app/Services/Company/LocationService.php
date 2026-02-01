@@ -5,21 +5,17 @@ namespace App\Services\Company;
 use App\Models\Device;
 use App\Models\Location;
 use App\Models\User;
-use App\Services\Audit\AuditService;
+use Auth;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\UnauthorizedException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class LocationService
 {
-    public function __construct(private AuditService $auditService) {}
     /**
      * Get paginated list of locations.
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -40,105 +36,89 @@ readonly class LocationService
 
     /**
      * Create a new location.
-     *
-     * @param array $data
-     * @return Location
      */
     public function create(array $data): Location
     {
-        $location = Location::create($data);
+        $user = Auth::user();
 
-        // Audit log
-        $this->auditService->log("location.created", Location::class, $location);
+        if (isset($user->company_id) && ($data["company_id"] !== $user->company_id)) {
+            throw new UnauthorizedException("Provided company doesn't belong to you.");
+        }
 
-        return $location;
+        return Location::create($data);
     }
 
     /**
      * Update a location.
-     *
-     * @param Location $location
-     * @param array $data
-     * @return Location
      */
     public function update(Location $location, array $data): Location
     {
         $location->update($data);
-
-        // Audit log
-        $this->auditService->log("location.updated", Location::class, $location);
 
         return $location->fresh();
     }
 
     /**
      * Delete a location (soft delete).
-     *
-     * @param Location $location
-     * @return void
      */
     public function delete(Location $location): void
     {
         $location->delete();
-
-        // Audit log
-        $this->auditService->log("location.deleted", Location::class, $location);
     }
 
     /**
      * Activate a location.
-     *
-     * @param Location $location
-     * @return Location
      */
     public function activate(Location $location): Location
     {
         $location->update(["is_active" => true]);
 
         // Audit log
-        $this->auditService->log("location.activated", Location::class, $location);
+        activity("location")
+            ->event("activated")
+            ->performedOn($location)
+            ->withProperties(["location_id" => $location->id])
+            ->log("Activated location \"{$location->name}\"");
 
         return $location->fresh();
     }
 
     /**
      * Deactivate a location.
-     *
-     * @param Location $location
-     * @return Location
      */
     public function deactivate(Location $location): Location
     {
         $location->update(["is_active" => false]);
 
         // Audit log
-        $this->auditService->log("location.deactivated", Location::class, $location);
+        activity("location")
+            ->performedOn($location)
+            ->event('deactivated')
+            ->withProperties(["location_id" => $location->id])
+            ->log("Deactivated location \"{$location->name}\"");
 
         return $location->fresh();
     }
 
     /**
      * Restore a soft-deleted location.
-     *
-     * @param Location $location
-     * @return Location
      */
     public function restore(Location $location): Location
     {
         $location->restore();
 
         // Audit log
-        $this->auditService->log("location.restored", Location::class, $location);
+        activity("location")
+            ->event("restored")
+            ->performedOn($location)
+            ->withProperties(["location_id" => $location->id])
+            ->log("Restored location \"{$location->name}\"");
 
         return $location->fresh();
     }
 
     /**
      * Get devices for a location.
-     *
-     * @param Location $location
-     * @param User $user
-     * @return Collection
      */
     public function getDevices(
         Location $location,
@@ -156,9 +136,6 @@ readonly class LocationService
 
     /**
      * Get statistics for a location.
-     *
-     * @param Location $location
-     * @return array
      */
     public function getStats(Location $location): array
     {

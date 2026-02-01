@@ -5,7 +5,6 @@ namespace App\Services\Support;
 use App\Models\Device;
 use App\Models\Ticket;
 use App\Models\User;
-use App\Services\Audit\AuditService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -14,13 +13,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class TicketService
 {
-    public function __construct(private AuditService $auditService) {}
     /**
      * Get paginated list of tickets.
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -50,10 +44,6 @@ readonly class TicketService
 
     /**
      * Create a new ticket.
-     *
-     * @param array $data
-     * @param User $user
-     * @return Ticket
      */
     public function create(array $data, User $user): Ticket
     {
@@ -73,70 +63,58 @@ readonly class TicketService
 
         $ticket = Ticket::create($data);
 
-        // Audit log
-        $this->auditService->log("ticket.created", Ticket::class, $ticket);
-
         return $ticket->fresh();
     }
 
     /**
      * Update a ticket.
-     *
-     * @param Ticket $ticket
-     * @param array $data
-     * @return Ticket
      */
     public function update(Ticket $ticket, array $data): Ticket
     {
         $ticket->update($data);
-
-        // Audit log
-        $this->auditService->log("ticket.updated", Ticket::class, $ticket);
 
         return $ticket->fresh();
     }
 
     /**
      * Change ticket status.
-     *
-     * @param Ticket $ticket
-     * @param string $status
-     * @return Ticket
      */
     public function changeStatus(Ticket $ticket, string $status): Ticket
     {
+        $oldStatus = $ticket->status;
+
         $ticket->changeStatus($status);
 
         // Audit log
-        $this->auditService->log(
-            "ticket.status_changed",
-            Ticket::class,
-            $ticket,
-        );
+        activity("ticket")
+            ->event('changed_status')
+            ->performedOn($ticket)
+            ->withProperties(['ticket_id' => $ticket->id])
+            ->log("Changed status from \"$oldStatus->value\" to \"$ticket->status->value\" for ticket \"$ticket->subject\"");
 
         return $ticket->fresh();
     }
 
     /**
      * Assign ticket to a user.
-     *
-     * @param Ticket $ticket
-     * @param int $assignedToUserId
-     * @param User $assignedBy
-     * @return Ticket
      */
     public function assign(
         Ticket $ticket,
         int $assignedToUserId,
         User $assignedBy,
     ): Ticket {
+        $assignedToUser = User::find($assignedToUserId);
         $ticket->assign(User::findOrFail($assignedToUserId));
 
         // Audit log
-        $this->auditService->log("ticket.assigned", Ticket::class, $ticket);
-
-        // TODO: Log audit
-        // $this->auditService->log('ticket.assigned', $ticket, $assignedBy, ['assigned_to' => $assignedToUserId]);
+        activity("ticket")
+            ->event('assigned')
+            ->performedOn($ticket)
+            ->withProperties([
+                'ticket_id' => $ticket->id,
+                'assigned_user_id' => $assignedToUser->id,
+            ])
+            ->log("Assigned ticket \"{$ticket->subject}\" to user \"{$assignedToUser->email}\"");
 
         // TODO: Send notification to assigned user
         // event(new TicketAssigned($ticket));
@@ -152,8 +130,6 @@ readonly class TicketService
      */
     public function delete(Ticket $ticket): bool
     {
-        // TODO: Log audit
-        // $this->auditService->log('ticket.deleted', $ticket, auth()->user());
 
         return $ticket->delete();
     }
