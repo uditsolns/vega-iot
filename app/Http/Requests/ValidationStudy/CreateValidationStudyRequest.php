@@ -32,3 +32,4 @@ class CreateValidationStudyRequest extends FormRequest
         ];
     }
 }
+

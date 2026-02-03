@@ -77,11 +77,6 @@ class User extends Authenticatable
             ->setDescriptionForEvent(fn($event) => ucfirst("{$event} user \"$this->email\""));
     }
 
-    public function tapActivity(Activity $activity, string $eventName): void
-    {
-        $activity->properties = $activity->properties->put('email', $this->email);
-    }
-
     /**
      * Get the company that owns the user.
      */

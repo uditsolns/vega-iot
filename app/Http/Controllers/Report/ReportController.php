@@ -8,7 +8,6 @@ use App\Http\Resources\ReportResource;
 use App\Models\Report;
 use App\Services\Report\ReportService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class ReportController extends Controller
 {
@@ -37,18 +36,26 @@ class ReportController extends Controller
         // Create report record
         $report = $this->reportService->create($data);
 
+        return $this->generate($report);
+    }
+
+    public function download(Report $report) {
+        $this->authorize("viewAny", Report::class);
+
+        return $this->generate($report);
+    }
+
+    public function generate(Report $report)
+    {
         try {
             // Generate PDF file
-            $filePath = $this->reportService->generateReport($report);
+            $pdfContent = $this->reportService->generateReport($report);
 
             // Return file download response
-            return response()->download(
-                Storage::path($filePath),
-                basename($filePath),
-                [
-                    'Content-Type' => 'application/pdf',
-                ]
-            )->deleteFileAfterSend(false); // Keep file for records
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $report->name . '.pdf"',
+            ]);
 
         } catch (\Exception $e) {
             \Log::error('Report generation failed', [

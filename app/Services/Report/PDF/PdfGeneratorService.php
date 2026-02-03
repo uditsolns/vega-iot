@@ -52,13 +52,7 @@ class PdfGeneratorService
             ReportFormat::Both => $this->generateBoth($data, $report),
         };
 
-        // Save PDF to storage
-        $filename = $this->generateFilename($report);
-        $path = "reports/pdf/{$filename}";
-
-        Storage::put($path, $this->mpdf->Output('', 'S'));
-
-        return $path;
+        return $this->mpdf->Output('', 'S');
     }
 
     /**

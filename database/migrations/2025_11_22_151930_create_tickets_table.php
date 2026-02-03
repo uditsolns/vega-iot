@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\TicketPriority;
+use App\Enums\TicketStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -48,8 +50,10 @@ return new class extends Migration {
             $table->string("subject");
             $table->text("description");
             $table->string("reason")->nullable();
-            $table->string("status")->default("open");
-            $table->string("priority")->default("medium");
+            $table->enum("status", TicketStatus::values())
+                ->default(TicketStatus::Open->value);
+            $table->enum("priority", TicketPriority::values())
+                ->default(TicketPriority::Medium->value);
 
             // Timestamps
             $table->timestamp("resolved_at")->nullable();

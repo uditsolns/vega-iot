@@ -55,11 +55,6 @@ class Device extends Model
             ->setDescriptionForEvent(fn($event) => ucfirst("$event device \"$this->device_code\""));
     }
 
-    public function tapActivity(Activity $activity, string $eventName): void
-    {
-        $activity->properties = $activity->properties->put('device_code', $this->device_code);
-    }
-
     protected function casts(): array
     {
         return [

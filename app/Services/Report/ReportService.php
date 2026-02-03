@@ -4,7 +4,6 @@ namespace App\Services\Report;
 
 use App\Models\Report;
 use App\Models\User;
-use App\Services\Audit\ActivityLogger;
 use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -56,7 +55,14 @@ readonly class ReportService
         $report = Report::create($data);
 
         // Audit log
-        ActivityLogger::logAction($report, "generated");
+        activity("report")
+            ->event("generated")
+            ->performedOn($report)
+            ->withProperties([
+                'report_id' => $report->id,
+                'data_formation' => $report->data_formation->value,
+            ])
+            ->log("Generated report \"$report->name\"");
 
         return $report;
     }

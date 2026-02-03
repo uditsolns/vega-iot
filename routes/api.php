@@ -5,6 +5,7 @@ use App\Enums\DeviceType;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AuditReportController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\ProfileController;
@@ -309,7 +310,17 @@ Route::prefix("v1")->group(function () {
             ->group(function () {
                 Route::get("/", "index");
                 Route::post("/", "store");
+                Route::get('{report}/download', 'download');
         });
+
+        // Audit Reports
+        Route::prefix('audit-reports')
+            ->controller(AuditReportController::class)
+            ->group(function () {
+                Route::get('/', 'index');
+                Route::post('/', 'store');
+                Route::get('{auditReport}/download', 'download');
+            });
 
         // Instruments
         Route::apiResource("calibration-instruments", CalibrationInstrumentController::class);

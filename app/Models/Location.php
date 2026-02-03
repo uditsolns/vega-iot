@@ -52,7 +52,7 @@ class Location extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('location')
-            ->setDescriptionForEvent(fn($eventName) => ucfirst("Location \"$this->name\" $eventName"));
+            ->setDescriptionForEvent(fn($eventName) => ucfirst("$eventName location \"$this->name\" "));
     }
 
     /**
