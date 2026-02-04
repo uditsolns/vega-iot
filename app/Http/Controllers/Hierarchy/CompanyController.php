@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Hierarchy;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Company\CreateCompanyRequest;
 use App\Http\Requests\Company\UpdateCompanyRequest;
 use App\Http\Resources\CompanyResource;

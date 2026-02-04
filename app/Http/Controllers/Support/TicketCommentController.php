@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Support;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Ticket\CreateCommentRequest;
 use App\Http\Resources\TicketCommentResource;
 use App\Models\Ticket;

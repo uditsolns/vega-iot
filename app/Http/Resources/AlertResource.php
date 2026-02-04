@@ -6,9 +6,7 @@ use App\Models\Alert;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @mixin Alert
- */
+/** @mixin Alert */
 class AlertResource extends JsonResource
 {
     /**

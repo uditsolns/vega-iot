@@ -3,27 +3,28 @@
 use App\Enums\DeviceStatus;
 use App\Enums\DeviceType;
 use App\Http\Controllers\AlertController;
-use App\Http\Controllers\AreaController;
 use App\Http\Controllers\AuditLogController;
-use App\Http\Controllers\AuditReportController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\CalibrationInstrumentController;
-use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Device\DeviceBulkController;
 use App\Http\Controllers\Device\DeviceConfigurationController;
 use App\Http\Controllers\Device\DeviceController;
-use App\Http\Controllers\HierarchyController;
+use App\Http\Controllers\Hierarchy\AreaController;
+use App\Http\Controllers\Hierarchy\CompanyController;
+use App\Http\Controllers\Hierarchy\HierarchyController;
+use App\Http\Controllers\Hierarchy\HubController;
+use App\Http\Controllers\Hierarchy\LocationController;
 use App\Http\Controllers\IngestController;
 use App\Http\Controllers\ReadingController;
-use App\Http\Controllers\HubController;
-use App\Http\Controllers\LocationController;
+use App\Http\Controllers\Report\AuditReportController;
 use App\Http\Controllers\Report\ReportController;
+use App\Http\Controllers\Report\ScheduledReportController;
 use App\Http\Controllers\RoleController;
-use App\Http\Controllers\TicketCommentController;
-use App\Http\Controllers\TicketController;
+use App\Http\Controllers\Support\TicketCommentController;
+use App\Http\Controllers\Support\TicketController;
 use App\Http\Controllers\User\UserAreaController;
 use App\Http\Controllers\User\UserController;
 use App\Http\Controllers\User\UserPermissionController;
@@ -312,6 +313,16 @@ Route::prefix("v1")->group(function () {
                 Route::post("/", "store");
                 Route::get('{report}/download', 'download');
         });
+
+        // Scheduled Reports
+        Route::apiResource("scheduled-reports", ScheduledReportController::class);
+        Route::prefix('scheduled-reports')
+            ->controller(ScheduledReportController::class)
+            ->group(function () {
+                Route::patch('{scheduledReport}/toggle', 'toggle');
+                Route::get('{scheduledReport}/executions', 'executions');
+                Route::post('{scheduledReport}/test', 'testRun');
+            });
 
         // Audit Reports
         Route::prefix('audit-reports')

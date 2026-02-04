@@ -23,7 +23,7 @@ class AuditReportResource extends JsonResource
             'generated_by' => $this->generated_by,
 
             'company' => new CompanyResource($this->whenLoaded('company')),
-            'generatedBy' => new UserResource($this->whenLoaded('generatedBy')),
+            'generated_by_user' => new UserResource($this->whenLoaded('generatedBy')),
         ];
     }
 }

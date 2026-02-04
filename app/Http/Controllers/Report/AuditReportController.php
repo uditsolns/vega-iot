@@ -1,7 +1,7 @@
 <?php
 // app/Http/Controllers/AuditReport/AuditReportController.php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Report;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AuditReport\CreateAuditReportRequest;

@@ -28,7 +28,7 @@ class ReportResource extends JsonResource
 
             'company' => new CompanyResource($this->whenLoaded('company')),
             'device' => new DeviceResource($this->whenLoaded('device')),
-            'generatedBy' => new UserResource($this->whenLoaded('generatedBy')),
+            'generated_by_user' => new UserResource($this->whenLoaded('generatedBy')),
         ];
     }
 }

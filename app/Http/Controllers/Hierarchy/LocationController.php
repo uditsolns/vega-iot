@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Hierarchy;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Alert\ListAlertsRequest;
 use App\Http\Requests\Location\CreateLocationRequest;
 use App\Http\Requests\Location\UpdateLocationRequest;

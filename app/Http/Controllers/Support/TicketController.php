@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Support;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Ticket\AssignTicketRequest;
 use App\Http\Requests\Ticket\ChangeStatusRequest;
 use App\Http\Requests\Ticket\CreateTicketRequest;

@@ -2,9 +2,11 @@
 
 namespace App\Http\Resources;
 
+use App\Models\AlertNotification;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/** @mixin AlertNotification */
 class AlertNotificationResource extends JsonResource
 {
     /**
@@ -28,8 +30,6 @@ class AlertNotificationResource extends JsonResource
             "error_message" => $this->error_message,
             "message_content" => $this->message_content,
             "external_reference" => $this->external_reference,
-            "created_at" => $this->created_at->toISOString(),
-            "updated_at" => $this->updated_at->toISOString(),
 
             // Relationships
             "alert" => new AlertResource($this->whenLoaded("alert")),

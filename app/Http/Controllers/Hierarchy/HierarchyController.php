@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Hierarchy;
 
+use App\Http\Controllers\Controller;
 use App\Http\Resources\AreaResource;
 use App\Http\Resources\HierarchyTreeResource;
 use App\Http\Resources\HubResource;

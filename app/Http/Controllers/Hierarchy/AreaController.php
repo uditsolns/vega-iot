@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Hierarchy;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\Alert\ListAlertsRequest;
 use App\Http\Requests\Area\CreateAreaRequest;
 use App\Http\Requests\Area\UpdateAlertConfigRequest;

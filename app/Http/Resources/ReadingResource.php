@@ -6,9 +6,7 @@ use App\Models\DeviceReading;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * @mixin DeviceReading
- */
+/** @mixin DeviceReading */
 class ReadingResource extends JsonResource
 {
     /**
