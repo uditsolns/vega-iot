@@ -3,147 +3,142 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Notification Queue
+    |--------------------------------------------------------------------------
+    |
+    | Queue name for processing notifications
+    |
+    */
+    'queue' => env('NOTIFICATION_QUEUE', 'notifications'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Notification Channels
     |--------------------------------------------------------------------------
     |
-    | Defines which notification channels are enabled and their configuration.
+    | Enable or disable specific notification channels
     |
     */
-
-    "channels" => [
-        "email" => [
-            "enabled" => true,
-            "provider" => "msgclub",
+    'channels' => [
+        'email' => [
+            'enabled' => env('NOTIFICATION_EMAIL_ENABLED', true),
         ],
-        "sms" => [
-            "enabled" => true,
-            "provider" => "msgclub",
+        'sms' => [
+            'enabled' => env('NOTIFICATION_SMS_ENABLED', true),
         ],
-        "voice" => [
-            "enabled" => false, // TODO: Enable when voice API is implemented
-            "provider" => "msgclub",
+        'voice' => [
+            'enabled' => env('NOTIFICATION_VOICE_ENABLED', false),
         ],
-        "push" => [
-            "enabled" => false, // TODO: Implement push notifications
-            "provider" => null,
+        'push' => [
+            'enabled' => env('NOTIFICATION_PUSH_ENABLED', false),
+        ],
+        'database' => [
+            'enabled' => env('NOTIFICATION_DATABASE_ENABLED', true),
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | MsgClub Provider Configuration
+    | MsgClub Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for MsgClub SMS, Email, and Voice services.
+    | Configuration for MsgClub SMS and Voice provider
     |
     */
+    'msgclub' => [
+        'auth_key' => env('MSGCLUB_AUTH_KEY', ''),
+        'base_url' => env('MSGCLUB_BASE_URL', 'https://api.msgclub.net'),
 
-    "msgclub" => [
-        "auth_key" => env("MSGCLUB_AUTH_KEY"),
-        "base_url" => env(
-            "MSGCLUB_BASE_URL",
-            "http://msg.msgclub.net/rest/services",
-        ),
-
-        "sms" => [
-            "sender_id" => env("MSGCLUB_SMS_SENDER_ID", "VEGADL"),
-            "route_id" => env("MSGCLUB_SMS_ROUTE_ID", "1"),
-            "content_type" => "english",
-            "timeout" => 30, // seconds
+        'sms' => [
+            'sender_id' => env('MSGCLUB_SMS_SENDER_ID', 'VEGAIO'),
+            'route_id' => env('MSGCLUB_SMS_ROUTE_ID', '1'),
+            'content_type' => env('MSGCLUB_SMS_CONTENT_TYPE', 'unicode'),
+            'timeout' => 30,
         ],
 
-        "email" => [
-            "route_id" => env("MSGCLUB_EMAIL_ROUTE_ID", 15),
-            "from_email" => env(
-                "MSGCLUB_EMAIL_FROM",
-                "support@vegadataloggers.online",
-            ),
-            "from_name" => env("MSGCLUB_EMAIL_FROM_NAME", "VEGA ENTERPRISES"),
-            "display_name" => "VEGA",
-            "timeout" => 30, // seconds
+        'email' => [
+            'route_id' => env('MSGCLUB_EMAIL_ROUTE_ID', '1'),
+            'from_email' => env('MSGCLUB_FROM_EMAIL', 'noreply@vegaiot.com'),
+            'from_name' => env('MSGCLUB_FROM_NAME', 'VEGA IoT'),
+            'display_name' => env('MSGCLUB_DISPLAY_NAME', 'VEGA IoT Monitoring System'),
+            'timeout' => 30,
         ],
 
-        "voice" => [
-            "enabled" => false,
-            "timeout" => 30, // seconds
-            // TODO: Add voice configuration when API details available
+        'voice' => [
+            'timeout' => 60,
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Notification Queue Settings
+    | SMS Templates
     |--------------------------------------------------------------------------
     |
-    | Queue names and retry configuration for notification jobs.
+    | SMS message templates with placeholders
     |
     */
-
-    "queue" => [
-        "connection" => env("QUEUE_CONNECTION", "database"),
-        "alerts" => "alerts",
-        "notifications" => "notifications",
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Retry Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Number of attempts and backoff times for failed notifications.
-    |
-    */
-
-    "retry" => [
-        "attempts" => 3,
-        "backoff" => [10, 30, 60], // seconds
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Notification Templates
-    |--------------------------------------------------------------------------
-    |
-    | Templates for different notification types and channels.
-    |
-    */
-
-    "templates" => [
-        "sms" => [
-            // Template: "Low and High with Hierarchy Device"
-            // Format: Dear {#var#}, {#var#} Alert for {#var#} {#var#}: Device {#var#} detected in {#var#} -> {#var#} -> {#var#} at {#var#}, current value {#var#}, Threshold Limit {#var#}. Immediate action required -VEGA ENTERPRISES
-            "alert_triggered" => [
-                "id" => "1707175586027788471",
-                "content" =>
-                    "Dear {name}, {severity} Alert for {sensor_type} {threshold_type}: Device {device_code} detected in {location} -> {hub} -> {area} at {datetime}, current value {value}, Threshold Limit {threshold}. Immediate action required -VEGA ENTERPRISES",
+    'templates' => [
+        'sms' => [
+            'alert_triggered' => [
+                'id' => env('MSGCLUB_TEMPLATE_ALERT_TRIGGERED'),
+                'content' => 'ALERT: {severity} alert for device {code} at {location}. Value: {value}. Threshold: {threshold}. Action required.',
             ],
-
-            // Template: "Back range with hierarchy"
-            // Format: Dear {#var#}, Device Back in Range: Device {#var#} detected in {#var#} -> {#var#} -> {#var#} at {#var#}, current value {#var#}, Threshold Limit {#var#}. No action required. -VEGA ENTERPRISES
-            "alert_back_in_range" => [
-                "id" => "1707175584686154584",
-                "content" =>
-                    "Dear {name}, Device Back in Range: Device {device_code} detected in {location} -> {hub} -> {area} at {datetime}, current value {value}, Threshold Limit {threshold}. No action required. -VEGA ENTERPRISES",
+            'alert_acknowledged' => [
+                'id' => env('MSGCLUB_TEMPLATE_ALERT_ACKNOWLEDGED'),
+                'content' => 'Alert acknowledged for device {code} at {location}. Alert is being monitored.',
             ],
-
-            // Using same template as triggered since no specific acknowledged template exists
-            "alert_acknowledged" => [
-                "id" => "1707175586027788471",
-                "content" =>
-                    "Dear {name}, {severity} Alert for {sensor_type} {threshold_type}: Device {device_code} detected in {location} -> {hub} -> {area} at {datetime}, current value {value}, Threshold Limit {threshold}. Immediate action required -VEGA ENTERPRISES",
+            'alert_resolved' => [
+                'id' => env('MSGCLUB_TEMPLATE_ALERT_RESOLVED'),
+                'content' => 'Alert resolved for device {code} at {location}. Issue has been addressed.',
             ],
-
-            // Using same template as triggered since no specific resolved template exists
-            "alert_resolved" => [
-                "id" => "1707175586027788471",
-                "content" =>
-                    "Dear {name}, {severity} Alert for {sensor_type} {threshold_type}: Device {device_code} detected in {location} -> {hub} -> {area} at {datetime}, current value {value}, Threshold Limit {threshold}. Immediate action required -VEGA ENTERPRISES",
+            'alert_back_in_range' => [
+                'id' => env('MSGCLUB_TEMPLATE_ALERT_BACK_IN_RANGE'),
+                'content' => 'Device {code} at {location} is back in normal range. Alert auto-resolved.',
             ],
         ],
 
-        "voice" => [
-            "alert_triggered" =>
-                "Dear {name}, Critical Alert: Device {device_code} in {location} at {datetime}. Current value: {value}. Immediate action required.",
+        'voice' => [
+            'alert_triggered' => 'Critical Alert. Device {code} at {location}. Current value {value}. Immediate action required.',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Preferences
+    |--------------------------------------------------------------------------
+    |
+    | Default notification preferences for new users
+    |
+    */
+    'preferences' => [
+        'default' => [
+            'email' => true,
+            'sms' => false,
+            'voice' => false,
+            'push' => false,
+            'database' => true,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rate Limiting
+    |--------------------------------------------------------------------------
+    |
+    | Rate limits for notifications per channel
+    |
+    */
+    'rate_limits' => [
+        'sms' => [
+            'max_per_user_per_hour' => 10,
+            'max_per_alert_per_hour' => 5,
+        ],
+        'voice' => [
+            'max_per_user_per_hour' => 3,
+            'max_per_alert_per_hour' => 2,
+        ],
+        'email' => [
+            'max_per_user_per_hour' => 50,
         ],
     ],
 ];

@@ -61,7 +61,7 @@ class ScheduledReport extends Model
     public function devices(): BelongsToMany
     {
         return $this->belongsToMany(Device::class, 'scheduled_report_devices')
-            ->withTimestamps();
+            ->withPivot("created_at");
     }
 
     public function executions(): HasMany

@@ -7,24 +7,23 @@ use App\Models\Alert;
 use App\Models\Device;
 use App\Models\DeviceReading;
 use App\Models\User;
-use App\Services\Notification\NotificationService;
+use App\Notifications\AlertAcknowledgedNotification;
+use App\Notifications\AlertBackInRangeNotification;
+use App\Notifications\AlertResolvedNotification;
+use App\Notifications\AlertTriggeredNotification;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Throwable;
+use Illuminate\Support\Facades\Notification;
 
 readonly class AlertLifecycleService
 {
     public function __construct(
         private ThresholdEvaluationService $thresholdService,
-        private NotificationService $notificationService,
     ) {}
 
     /**
      * Evaluate a reading and process alerts
-     *
-     * @param Device $device
-     * @param DeviceReading $reading
      */
     public function evaluateAndProcess(
         Device $device,
@@ -52,7 +51,6 @@ readonly class AlertLifecycleService
 
             Log::debug("Violations: ", $violations);
 
-            // TODO: update the logic
             // Check for existing active or acknowledged alerts
             $existingAlert = Alert::where('device_id', $device->id)
                 ->whereIn('status', [
@@ -91,23 +89,17 @@ readonly class AlertLifecycleService
         if (!$existingAlert) {
             // No existing alert - create new alert and notify
             $alert = $this->createAlert($device, $violation);
-            $this->notificationService->notifyForAlert($alert, "triggered");
+            $this->sendNotification($alert, AlertTriggeredNotification::class);
         } elseif ($existingAlert->status === AlertStatus::Active) {
             // Active alert still violated - update and notify
             $this->updateAlert($existingAlert, $violation);
-            $this->notificationService->notifyForAlert(
-                $existingAlert,
-                "triggered",
-            );
+            $this->sendNotification($existingAlert, AlertTriggeredNotification::class);
         } elseif ($existingAlert->status === AlertStatus::Acknowledged) {
             // Acknowledged alert still violated - update and notify based on interval
             $this->updateAlert($existingAlert, $violation);
 
             if ($this->shouldSendNotification($existingAlert, $device->area)) {
-                $this->notificationService->notifyForAlert(
-                    $existingAlert,
-                    "triggered",
-                );
+                $this->sendNotification($existingAlert, AlertTriggeredNotification::class);
             }
         }
     }
@@ -125,10 +117,7 @@ readonly class AlertLifecycleService
 
             // Send notification if enabled
             if ($device->area && $device->area->alert_back_in_range_enabled) {
-                $this->notificationService->notifyForAlert(
-                    $existingAlert,
-                    "back_in_range",
-                );
+                $this->sendNotification($existingAlert, AlertBackInRangeNotification::class);
             }
 
             Log::info("Alert auto-resolved - sensor back in range", [
@@ -206,13 +195,74 @@ readonly class AlertLifecycleService
     }
 
     /**
+     * Send notification using Laravel's notification system
+     */
+    private function sendNotification(Alert $alert, string $notificationClass): void
+    {
+        try {
+            $users = $this->getUsersToNotify($alert->device->area);
+
+            if ($users->isEmpty()) {
+                Log::warning('No users to notify for alert', [
+                    'alert_id' => $alert->id,
+                    'device_id' => $alert->device_id,
+                ]);
+                return;
+            }
+
+            // Create notification instance
+            $notification = new $notificationClass($alert);
+
+            // Send to all users
+            Notification::send($users, $notification);
+
+            // Update alert notification tracking
+            $alert->incrementNotificationCount();
+
+            Log::info('Alert notifications sent', [
+                'alert_id' => $alert->id,
+                'users_count' => $users->count(),
+                'notification_type' => $notificationClass,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to send alert notification', [
+                'alert_id' => $alert->id,
+                'notification_type' => $notificationClass,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Get users who should be notified about this area's alerts
+     */
+    private function getUsersToNotify($area)
+    {
+        if (!$area) {
+            return collect();
+        }
+
+        // Get all active users who have access to this area
+        return User::query()
+            ->where("is_active", true)
+            ->where(function ($query) use ($area) {
+                // Users with no area restrictions in the same company
+                $query
+                    ->whereHas("company", function ($q) use ($area) {
+                        $q->where("id", $area->hub->location->company_id);
+                    })
+                    ->whereDoesntHave("areaAccess")
+
+                    // OR users with explicit access to this area
+                    ->orWhereHas("areaAccess", function ($q) use ($area) {
+                        $q->where("area_id", $area->id);
+                    });
+            })
+            ->get();
+    }
+
+    /**
      * Acknowledge an alert
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param string|null $comment
-     * @return bool
-     * @throws Throwable
      */
     public function acknowledge(
         Alert $alert,
@@ -225,7 +275,7 @@ readonly class AlertLifecycleService
 
         DB::transaction(function () use ($alert, $user, $comment) {
             $alert->acknowledge($user, $comment);
-            $this->notificationService->notifyForAlert($alert, "acknowledged");
+            $this->sendNotification($alert, AlertAcknowledgedNotification::class);
         });
 
         Log::info("Alert acknowledged", [
@@ -238,12 +288,6 @@ readonly class AlertLifecycleService
 
     /**
      * Manually resolve an alert
-     *
-     * @param Alert $alert
-     * @param User $user
-     * @param string|null $comment
-     * @return bool
-     * @throws Throwable
      */
     public function resolve(
         Alert $alert,
@@ -261,7 +305,7 @@ readonly class AlertLifecycleService
 
         DB::transaction(function () use ($alert, $user, $comment) {
             $alert->resolve($user, $comment, false);
-            $this->notificationService->notifyForAlert($alert, "resolved");
+            $this->sendNotification($alert, AlertResolvedNotification::class);
         });
 
         Log::info("Alert manually resolved", [

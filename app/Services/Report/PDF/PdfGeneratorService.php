@@ -2,12 +2,11 @@
 
 namespace App\Services\Report\PDF;
 
+use App\DTOs\ReportGenerationDTO;
 use App\Enums\ReportFormat;
 use App\Models\Device;
-use App\Models\Report;
-use Mpdf\Mpdf;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
+use Mpdf\Mpdf;
 use Mpdf\MpdfException;
 
 class PdfGeneratorService
@@ -38,18 +37,25 @@ class PdfGeneratorService
      * Generate PDF based on report format
      * @throws MpdfException
      */
-    public function generate(Report $report, Device $device, array $readingsData): string
-    {
+    public function generate(
+        ReportGenerationDTO $reportDto,
+        Device $device,
+        array $readingsData
+    ): string {
         // Merge all data for template
-        $data = array_merge($readingsData['device_info'], $readingsData['report_info'], $readingsData['statistics']);
+        $data = array_merge(
+            $readingsData['device_info'],
+            $readingsData['report_info'],
+            $readingsData['statistics']
+        );
         $data['logs'] = $readingsData['logs'];
-        $data['user_name'] = $report->generatedBy->email;
+        $data['user_name'] = auth()->user()?->email ?? 'System';
 
         // Generate PDF based on format
-        match ($report->format) {
-            ReportFormat::Graphical => $this->generateGraphical($data, $report),
-            ReportFormat::Tabular => $this->generateTabular($data, $report),
-            ReportFormat::Both => $this->generateBoth($data, $report),
+        match ($reportDto->format) {
+            ReportFormat::Graphical => $this->generateGraphical($data, $reportDto),
+            ReportFormat::Tabular => $this->generateTabular($data, $reportDto),
+            ReportFormat::Both => $this->generateBoth($data, $reportDto),
         };
 
         return $this->mpdf->Output('', 'S');
@@ -59,9 +65,12 @@ class PdfGeneratorService
      * Generate graphical report (device info + charts)
      * @throws MpdfException
      */
-    private function generateGraphical(array $data, Report $report): void
+    private function generateGraphical(array $data, ReportGenerationDTO $reportDto): void
     {
-        $html = View::make('reports.pdf.graphical', compact('data', 'report'))->render();
+        $html = View::make('reports.pdf.graphical', [
+            'data' => $data,
+            'report' => $reportDto
+        ])->render();
         $this->mpdf->WriteHTML($html);
     }
 
@@ -69,9 +78,12 @@ class PdfGeneratorService
      * Generate tabular report (device info + data table)
      * @throws MpdfException
      */
-    private function generateTabular(array $data, Report $report): void
+    private function generateTabular(array $data, ReportGenerationDTO $reportDto): void
     {
-        $html = View::make('reports.pdf.tabular', compact('data', 'report'))->render();
+        $html = View::make('reports.pdf.tabular', [
+            'data' => $data,
+            'report' => $reportDto
+        ])->render();
         $this->mpdf->WriteHTML($html);
     }
 
@@ -79,22 +91,12 @@ class PdfGeneratorService
      * Generate combined report (device info + charts + table)
      * @throws MpdfException
      */
-    private function generateBoth(array $data, Report $report): void
+    private function generateBoth(array $data, ReportGenerationDTO $reportDto): void
     {
-        $html = View::make('reports.pdf.graphical-tabular', compact('data', 'report'))->render();
+        $html = View::make('reports.pdf.graphical-tabular', [
+            'data' => $data,
+            'report' => $reportDto
+        ])->render();
         $this->mpdf->WriteHTML($html);
-    }
-
-    /**
-     * Generate unique filename for PDF
-     */
-    private function generateFilename(Report $report): string
-    {
-        return sprintf(
-            'report_%s_%s_%s.pdf',
-            $report->id,
-            $report->device->device_code,
-            now()->format('YmdHis')
-        );
     }
 }

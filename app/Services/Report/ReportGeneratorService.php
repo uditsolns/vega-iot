@@ -2,11 +2,12 @@
 
 namespace App\Services\Report;
 
+use App\Contracts\ReportableInterface;
+use App\DTOs\ReportGenerationDTO;
 use App\Enums\ReportDataFormation;
 use App\Enums\ReportFileType;
 use App\Models\Device;
 use App\Models\DeviceReading;
-use App\Models\Report;
 use App\Services\Report\PDF\PdfGeneratorService;
 use Exception;
 use Mpdf\MpdfException;
@@ -18,28 +19,34 @@ readonly class ReportGeneratorService
     ) {}
 
     /**
-     * Generate report based on type and format
-     *
-     * @param Report $report
-     * @return string Path to generated file
+     * Generate report from a Reportable entity
      * @throws Exception
      */
-    public function generate(Report $report): string
+    public function generateFromReportable(ReportableInterface $reportable): string
+    {
+        $dto = ReportGenerationDTO::fromReportable($reportable);
+        return $this->generate($dto);
+    }
+
+    /**
+     * Generate report from a DTO
+     */
+    public function generate(ReportGenerationDTO $dto): string
     {
         // Load device with necessary relationships
         $device = Device::with([
             'company',
             'area.hub.location',
             'currentConfiguration'
-        ])->findOrFail($report->device_id);
+        ])->findOrFail($dto->deviceId);
 
         // Fetch readings data
-        $readingsData = $this->fetchReadingsData($report, $device);
+        $readingsData = $this->fetchReadingsData($dto, $device);
 
         // Determine generation method based on file type
-        return match ($report->file_type) {
-            ReportFileType::Pdf => $this->generatePdf($report, $device, $readingsData),
-            ReportFileType::Csv => $this->generateCsv($report, $device, $readingsData),
+        return match ($dto->fileType) {
+            ReportFileType::Pdf => $this->generatePdf($dto, $device, $readingsData),
+            ReportFileType::Csv => $this->generateCsv($dto, $device, $readingsData),
         };
     }
 
@@ -47,10 +54,13 @@ readonly class ReportGeneratorService
      * Generate PDF report
      * @throws MpdfException
      */
-    private function generatePdf(Report $report, Device $device, array $readingsData): string
-    {
+    private function generatePdf(
+        ReportGenerationDTO $dto,
+        Device $device,
+        array $readingsData
+    ): string {
         return $this->pdfGenerator->generate(
-            report: $report,
+            reportDto: $dto,
             device: $device,
             readingsData: $readingsData
         );
@@ -60,8 +70,11 @@ readonly class ReportGeneratorService
      * Generate CSV report (future implementation)
      * @throws Exception
      */
-    private function generateCsv(Report $report, Device $device, array $readingsData): string
-    {
+    private function generateCsv(
+        ReportGenerationDTO $dto,
+        Device $device,
+        array $readingsData
+    ): string {
         // TODO: Implement CSV generation in Phase 2
         throw new Exception('CSV generation not yet implemented');
     }
@@ -69,12 +82,12 @@ readonly class ReportGeneratorService
     /**
      * Fetch readings data based on report parameters
      */
-    private function fetchReadingsData(Report $report, Device $device): array
+    private function fetchReadingsData(ReportGenerationDTO $dto, Device $device): array
     {
         $query = DeviceReading::where('device_id', $device->id)
             ->whereBetween('recorded_at', [
-                $report->from_datetime,
-                $report->to_datetime
+                $dto->fromDatetime,
+                $dto->toDatetime
             ])
             ->orderBy('recorded_at');
 
@@ -82,18 +95,18 @@ readonly class ReportGeneratorService
         $readings = $query->get();
 
         // Format data based on device type and data formation
-        return $this->formatReadingsData($readings, $device, $report);
+        return $this->formatReadingsData($readings, $device, $dto);
     }
 
     /**
      * Format readings data based on device type and data formation enum
      */
-    private function formatReadingsData($readings, Device $device, Report $report): array
+    private function formatReadingsData($readings, Device $device, ReportGenerationDTO $dto): array
     {
         $formattedData = [
             'logs' => [],
             'device_info' => $this->getDeviceInfo($device),
-            'report_info' => $this->getReportInfo($report),
+            'report_info' => $this->getReportInfo($dto, $device),
         ];
 
         foreach ($readings as $reading) {
@@ -102,7 +115,7 @@ readonly class ReportGeneratorService
             ];
 
             // Add data based on device type and data formation
-            switch ($report->data_formation) {
+            switch ($dto->dataFormation) {
                 case ReportDataFormation::SingleTemperature:
                     $log['temperature'] = $reading->temperature;
                     break;
@@ -129,7 +142,7 @@ readonly class ReportGeneratorService
         }
 
         // Calculate statistics
-        $formattedData['statistics'] = $this->calculateStatistics($readings, $report->data_formation);
+        $formattedData['statistics'] = $this->calculateStatistics($readings, $dto->dataFormation);
 
         return $formattedData;
     }
@@ -158,15 +171,15 @@ readonly class ReportGeneratorService
     /**
      * Get report configuration information
      */
-    private function getReportInfo(Report $report): array
+    private function getReportInfo(ReportGenerationDTO $dto, Device $device): array
     {
-        $config = $report->device->currentConfiguration;
+        $config = $device->currentConfiguration;
 
         return [
-            'report_name' => $report->name,
-            'start_dt' => $report->from_datetime->format('d-m-Y H:i:s'),
-            'end_dt' => $report->to_datetime->format('d-m-Y H:i:s'),
-            'data_formation' => $report->data_formation->value,
+            'report_name' => $dto->reportName,
+            'start_dt' => $dto->fromDatetime->format('d-m-Y H:i:s'),
+            'end_dt' => $dto->toDatetime->format('d-m-Y H:i:s'),
+            'data_formation' => $dto->dataFormation->value,
             'record_interval' => $config->record_interval ?? 5,
             'sending_interval' => $config->send_interval ?? 15,
             'min_temp' => $config->temp_min_critical ?? 20,

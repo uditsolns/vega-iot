@@ -11,14 +11,12 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class ReportService
 {
-    public function __construct(private ReportGeneratorService $reportGenerator) {}
+    public function __construct(
+        private ReportGeneratorService $reportGenerator
+    ) {}
 
     /**
      * Get paginated list of reports.
-     *
-     * @param array $filters
-     * @param User $user
-     * @return LengthAwarePaginator
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -44,14 +42,11 @@ readonly class ReportService
     }
 
     /**
-     * Create a new report.
-     *
-     * @param array $data
-     * @return Report
+     * Create a new report record
      */
     public function create(array $data): Report
     {
-        // Create report
+        // Create report record
         $report = Report::create($data);
 
         // Audit log
@@ -68,14 +63,11 @@ readonly class ReportService
     }
 
     /**
-     * Generate report file (PDF/CSV)
-     *
-     * @param Report $report
-     * @return string File path
+     * Generate report file (PDF/CSV) from a Report model
      * @throws Exception
      */
     public function generateReport(Report $report): string
     {
-        return $this->reportGenerator->generate($report);
+        return $this->reportGenerator->generateFromReportable($report);
     }
 }

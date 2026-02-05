@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\DeviceType;
+use App\Enums\ReportDataFormation;
 use App\Enums\ReportFileType;
 use App\Enums\ReportFormat;
 use App\Enums\ScheduledReportFrequency;
@@ -29,7 +30,7 @@ return new class extends Migration {
             $table->enum('device_type', DeviceType::values());
             $table->enum('file_type', ReportFileType::values())->default(ReportFileType::Pdf->value);
             $table->enum('format', ReportFormat::values())->default(ReportFormat::Graphical->value);
-            $table->enum('data_formation', DeviceType::values());
+            $table->enum('data_formation', ReportDataFormation::values());
             $table->integer('interval');
 
             // status;

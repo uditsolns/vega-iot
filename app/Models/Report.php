@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Contracts\ReportableInterface;
 use App\Enums\ReportDataFormation;
 use App\Enums\ReportFileType;
 use App\Enums\ReportFormat;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Report extends Model
+class Report extends Model implements ReportableInterface
 {
     public $timestamps = false;
 
@@ -61,5 +63,51 @@ class Report extends Model
             'to_datetime' => 'datetime',
             'generated_at' => 'timestamp',
         ];
+    }
+
+    // REPORTABLE INTERFACE IMPLEMENTATION
+    public function getReportName(): string
+    {
+        return $this->name;
+    }
+
+    public function getFileType(): ReportFileType
+    {
+        return $this->file_type;
+    }
+
+    public function getFormat(): ReportFormat
+    {
+        return $this->format;
+    }
+
+    public function getDataFormation(): ReportDataFormation
+    {
+        return $this->data_formation;
+    }
+
+    public function getInterval(): int
+    {
+        return $this->interval;
+    }
+
+    public function getFromDatetime(): Carbon
+    {
+        return $this->from_datetime;
+    }
+
+    public function getToDatetime(): Carbon
+    {
+        return $this->to_datetime;
+    }
+
+    public function getDeviceId(): int
+    {
+        return $this->device_id;
+    }
+
+    public function getCompanyId(): int
+    {
+        return $this->company_id;
     }
 }

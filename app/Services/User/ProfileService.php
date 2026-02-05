@@ -34,7 +34,7 @@ class ProfileService
     public function updateProfile(User $user, array $data): User
     {
         // Only allow updating specific fields
-        $allowedFields = ['first_name', 'last_name', 'phone'];
+        $allowedFields = ['first_name', 'last_name', 'phone', 'email'];
 
         $updateData = array_intersect_key($data, array_flip($allowedFields));
 

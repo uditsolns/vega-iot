@@ -2,16 +2,17 @@
 
 namespace App\Services\ScheduledReport;
 
-use App\Mail\ScheduledReportMail;
 use App\Models\Report;
 use App\Models\ScheduledReport;
 use App\Models\ScheduledReportExecution;
+use App\Models\User;
+use App\Notifications\ScheduledReportNotification;
+use App\Services\Report\Adapters\ScheduledReportAdapter;
 use App\Services\Report\ReportGeneratorService;
 use Carbon\Carbon;
 use Exception;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 
 readonly class ScheduledReportExecutionService
 {
@@ -39,27 +40,34 @@ readonly class ScheduledReportExecutionService
 
             foreach ($devices as $device) {
                 try {
-                    $reportData = [
-                        'company_id' => $scheduledReport->company_id,
-                        'device_id' => $device->id,
-                        'generated_by' => $scheduledReport->created_by,
-                        'name' => "{$scheduledReport->name} - {$device->device_code}",
-                        'file_type' => $scheduledReport->file_type,
-                        'format' => $scheduledReport->format,
-                        'data_formation' => $scheduledReport->data_formation,
-                        'interval' => $scheduledReport->interval,
-                        'from_datetime' => $fromDatetime,
-                        'to_datetime' => $toDatetime,
-                    ];
+                    // Create adapter for this device
+                    $reportableAdapter = new ScheduledReportAdapter(
+                        scheduledReport: $scheduledReport,
+                        device: $device,
+                        fromDatetime: $fromDatetime,
+                        toDatetime: $toDatetime
+                    );
 
-                    $report = Report::create($reportData);
-                    $pdfContent = $this->reportGenerator->generate($report);
+                    // Generate report using the adapter (no Report model created)
+                    $pdfContent = $this->reportGenerator->generateFromReportable($reportableAdapter);
+
+                    // Save PDF to temp storage
+                    $filename = "{$device->device_code}_{$fromDatetime->format('Ymd')}_{$toDatetime->format('Ymd')}.pdf";
+                    $pdfPath = storage_path("app/temp/scheduled-reports/{$scheduledReport->id}/{$filename}");
+
+                    // Ensure directory exists
+                    if (!is_dir(dirname($pdfPath))) {
+                        mkdir(dirname($pdfPath), 0755, true);
+                    }
+
+                    file_put_contents($pdfPath, $pdfContent);
 
                     $generatedReports[] = [
                         'device_code' => $device->device_code,
                         'device_name' => $device->device_name ?? $device->device_code,
                         'pdf_content' => $pdfContent,
-                        'filename' => "{$device->device_code}_{$fromDatetime->format('Ymd')}_{$toDatetime->format('Ymd')}.pdf",
+                        'pdf_path' => $pdfPath,
+                        'filename' => $filename,
                     ];
 
                     $execution->increment('reports_generated');
@@ -81,6 +89,9 @@ readonly class ScheduledReportExecutionService
 
             if (!empty($generatedReports)) {
                 $this->sendReports($scheduledReport, $generatedReports);
+
+                // Cleanup temp files after sending
+                $this->cleanupTempFiles($scheduledReport->id);
             }
 
             $status = empty($failedDevices) ? 'success' : (empty($generatedReports) ? 'failed' : 'partial');
@@ -113,18 +124,64 @@ readonly class ScheduledReportExecutionService
         return $execution;
     }
 
+    /**
+     * Send reports using Laravel notifications
+     */
     private function sendReports(ScheduledReport $scheduledReport, array $reports): void
     {
-        foreach ($scheduledReport->recipient_emails as $email) {
-            try {
-                Mail::to($email)->send(new ScheduledReportMail($scheduledReport, $reports));
-            } catch (Exception $e) {
-                Log::error('Failed to send scheduled report email', [
+        try {
+            // Get users by email
+            $recipients = User::whereIn('email', $scheduledReport->recipient_emails)->get();
+
+            Log::debug("Recipients: ", $recipients->toArray());
+
+            if ($recipients->isEmpty()) {
+                Log::warning('No valid recipients found for scheduled report', [
                     'scheduled_report_id' => $scheduledReport->id,
-                    'email' => $email,
-                    'error' => $e->getMessage(),
+                    'emails' => $scheduledReport->recipient_emails,
                 ]);
+                return;
             }
+
+            // Send using Laravel notifications
+            Notification::send(
+                $recipients,
+                new ScheduledReportNotification(
+                    scheduledReport: $scheduledReport,
+                    reports: $reports,
+                    successCount: count(array_filter($reports, fn($r) => !isset($r['error']))),
+                    failureCount: count(array_filter($reports, fn($r) => isset($r['error'])))
+                )
+            );
+
+            Log::info('Scheduled report notifications sent', [
+                'scheduled_report_id' => $scheduledReport->id,
+                'recipients_count' => $recipients->count(),
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to send scheduled report notifications', [
+                'scheduled_report_id' => $scheduledReport->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Cleanup temporary PDF files
+     */
+    private function cleanupTempFiles(int $scheduledReportId): void
+    {
+        try {
+            $tempDir = storage_path("app/temp/scheduled-reports/{$scheduledReportId}");
+            if (is_dir($tempDir)) {
+                array_map('unlink', glob("$tempDir/*"));
+                rmdir($tempDir);
+            }
+        } catch (Exception $e) {
+            Log::warning('Failed to cleanup temp files', [
+                'scheduled_report_id' => $scheduledReportId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

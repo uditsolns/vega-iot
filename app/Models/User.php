@@ -78,6 +78,29 @@ class User extends Authenticatable
     }
 
     /**
+     * Route notifications for MsgClub SMS channel
+     */
+    public function routeNotificationForMsgClubSms($notification): ?string
+    {
+        return $this->phone;
+    }
+
+    /**
+     * Route notifications for MsgClub Email channel
+     */
+    public function routeNotificationForMsgClubEmail($notification): ?string
+    {
+        return $this->email;
+    }
+
+    /**
+     * Route notifications for MsgClub Voice channel
+     */
+    public function routeNotificationForMsgClubVoice($notification): ?string
+    {
+        return $this->phone;
+    }
+    /**
      * Get the company that owns the user.
      */
     public function company(): BelongsTo
