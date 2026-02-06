@@ -4,35 +4,38 @@ namespace App\Notifications;
 
 use App\Channels\MsgClubEmailChannel;
 use App\Channels\MsgClubSmsChannel;
-use App\Models\Alert;
+use App\Models\Device;
 use App\Notifications\Messages\MsgClubEmailMessage;
 use App\Notifications\Messages\MsgClubSmsMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
-class AlertAcknowledgedNotification extends Notification implements ShouldQueue
+class AlertAcknowledgedNotification extends Notification
 {
     use Queueable;
 
-//    public int $tries = 3;
-//    public array $backoff = [10, 30, 60];
-
     public function __construct(
-        public readonly Alert $alert
+        public readonly int $alertId,
+        public readonly int $deviceId,
+        public readonly string $deviceCode,
+        public readonly int $acknowledgedBy,
+        public readonly string $acknowledgedByName,
+        public readonly string $acknowledgedAt
     ) {
-        $this->onQueue(config('notifications.queue', 'notifications'));
+//        $this->onQueue(config('notifications.queue', 'notifications'));
     }
 
     public function via($notifiable): array
     {
-        $area = $this->alert->device->area;
+        $channels = ['database'];
+
+        $device = Device::with('area')->find($this->deviceId);
+        $area = $device?->area;
 
         if (!$area) {
-            return [];
+            return $channels;
         }
-
-        $channels = [];
 
         if ($area->alert_email_enabled &&
             config('notifications.channels.email.enabled', true)) {
@@ -49,39 +52,50 @@ class AlertAcknowledgedNotification extends Notification implements ShouldQueue
 
     public function toMsgClubSms($notifiable): MsgClubSmsMessage
     {
-        $acknowledgedBy = $this->alert->acknowledgedBy;
-
         return (new MsgClubSmsMessage)
             ->template('alert_acknowledged')
             ->data([
-                'code' => $this->alert->device->device_code,
-                'user' => $acknowledgedBy ? $acknowledgedBy->first_name : 'Unknown',
+                'code' => $this->deviceCode,
+                'user' => $this->acknowledgedByName,
             ]);
     }
 
     public function toMsgClubEmail($notifiable): MsgClubEmailMessage
     {
+        $alert = \App\Models\Alert::with(['device.area.hub.location', 'acknowledgedBy'])
+            ->find($this->alertId);
+        $device = $alert->device;
+
         return (new MsgClubEmailMessage)
-            ->subject("Alert Acknowledged: {$this->alert->device->device_code}")
+            ->subject("Alert Acknowledged: {$this->deviceCode}")
             ->view('emails.alerts.acknowledged', [
-                'alert' => $this->alert,
+                'alert' => $alert,
                 'user' => $notifiable,
-                'device' => $this->alert->device,
-                'area' => $this->alert->device->area,
-                'data' => $this->getTemplateData(),
+                'device' => $device,
+                'area' => $device->area,
+                'data' => [
+                    'code' => $device->device_code,
+                    'device_name' => $device->device_name ?? $device->device_code,
+                    'location' => $device->area?->hub?->location?->name ?? 'N/A',
+                    'area' => $device->area?->name ?? 'N/A',
+                ],
             ]);
     }
 
-    protected function getTemplateData(): array
+    public function toArray($notifiable): array
     {
-        $device = $this->alert->device;
-        $area = $device->area;
+        $device = Device::with('area.hub.location')->find($this->deviceId);
 
         return [
-            'code' => $device->device_code,
-            'device_name' => $device->device_name ?? $device->device_code,
-            'location' => $area?->hub?->location?->name ?? 'N/A',
-            'area' => $area?->name ?? 'N/A',
+            'alert_id' => $this->alertId,
+            'device_id' => $this->deviceId,
+            'device_code' => $this->deviceCode,
+            'device_name' => $device->device_name ?? $this->deviceCode,
+            'acknowledged_by' => $this->acknowledgedBy,
+            'acknowledged_by_name' => $this->acknowledgedByName,
+            'acknowledged_at' => $this->acknowledgedAt,
+            'location' => $device->area?->hub?->location?->name ?? 'N/A',
+            'event' => 'acknowledged',
         ];
     }
 }

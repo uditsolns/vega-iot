@@ -33,15 +33,22 @@ class MsgClubEmailChannel
         // Render HTML content
         $htmlContent = $message->render();
 
-        // Send via provider
+        // Get attachments (file paths)
+        $attachmentPaths = [];
+        foreach ($message->getAttachments() as $attachment) {
+            $attachmentPaths[] = $attachment['path'];
+        }
+
+        // Send via provider with attachments
         $response = $this->provider->sendEmail(
             email: $email,
             name: trim("{$notifiable->first_name} {$notifiable->last_name}"),
             subject: $message->subject,
-            htmlContent: $htmlContent
+            htmlContent: $htmlContent,
+            attachments: $attachmentPaths
         );
 
-        // Throw exception on failure
+        // Throw exception on failure (will trigger retry)
         if (!$response['success']) {
             throw new \Exception($response['error'] ?? 'Email sending failed');
         }
@@ -50,6 +57,7 @@ class MsgClubEmailChannel
             'notifiable_id' => $notifiable->id,
             'email' => $email,
             'subject' => $message->subject,
+            'attachments_count' => count($attachmentPaths),
             'reference' => $response['reference'] ?? null,
         ]);
     }

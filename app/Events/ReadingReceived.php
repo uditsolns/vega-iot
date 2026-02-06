@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use App\Models\Device;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -14,36 +13,42 @@ class ReadingReceived implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
-     * The device that sent the reading.
-     *
-     * @var Device
+     * Store only IDs and primitive data, not the entire Device model
      */
-    public Device $device;
-
-    /**
-     * The reading data.
-     *
-     * @var array
-     */
-    public array $reading;
-
-    /**
-     * Create a new event instance.
-     */
-    public function __construct(Device $device, array $reading)
-    {
-        $this->device = $device;
-        $this->reading = $reading;
-    }
+    public function __construct(
+        public readonly int $deviceId,
+        public readonly string $recordedAt,
+        public readonly array $readingData
+    ) {}
 
     /**
      * Get the channels the event should broadcast on.
-     *
-     * @return Channel
      */
     public function broadcastOn(): Channel
     {
-        return new Channel("devices." . $this->device->id);
+        return new Channel("devices.{$this->deviceId}");
     }
 
+    /**
+     * The event's broadcast name.
+     */
+    public function broadcastAs(): string
+    {
+        return 'reading.received';
+    }
+
+    /**
+     * Get the data to broadcast.
+     */
+    public function broadcastWith(): array
+    {
+        return [
+            'device_id' => $this->deviceId,
+            'recorded_at' => $this->recordedAt,
+            'temperature' => $this->readingData['temperature'] ?? null,
+            'humidity' => $this->readingData['humidity'] ?? null,
+            'temp_probe' => $this->readingData['temp_probe'] ?? null,
+            'battery_percentage' => $this->readingData['battery_percentage'] ?? null,
+        ];
+    }
 }

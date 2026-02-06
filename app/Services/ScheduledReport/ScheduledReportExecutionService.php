@@ -2,7 +2,6 @@
 
 namespace App\Services\ScheduledReport;
 
-use App\Models\Report;
 use App\Models\ScheduledReport;
 use App\Models\ScheduledReportExecution;
 use App\Models\User;
@@ -32,7 +31,7 @@ readonly class ScheduledReportExecutionService
 
         try {
             $devices = $scheduledReport->devices;
-            $generatedReports = [];
+            $reportFilePaths = [];
             $failedDevices = [];
 
             $fromDatetime = $this->getFromDatetime($scheduledReport);
@@ -62,12 +61,12 @@ readonly class ScheduledReportExecutionService
 
                     file_put_contents($pdfPath, $pdfContent);
 
-                    $generatedReports[] = [
+                    // Store only file path and metadata, NOT the PDF content
+                    $reportFilePaths[] = [
                         'device_code' => $device->device_code,
                         'device_name' => $device->device_name ?? $device->device_code,
-                        'pdf_content' => $pdfContent,
-                        'pdf_path' => $pdfPath,
                         'filename' => $filename,
+                        'path' => $pdfPath,
                     ];
 
                     $execution->increment('reports_generated');
@@ -87,14 +86,14 @@ readonly class ScheduledReportExecutionService
                 }
             }
 
-            if (!empty($generatedReports)) {
-                $this->sendReports($scheduledReport, $generatedReports);
+            if (!empty($reportFilePaths)) {
+                $this->sendReports($scheduledReport, $reportFilePaths);
 
                 // Cleanup temp files after sending
                 $this->cleanupTempFiles($scheduledReport->id);
             }
 
-            $status = empty($failedDevices) ? 'success' : (empty($generatedReports) ? 'failed' : 'partial');
+            $status = empty($failedDevices) ? 'success' : (empty($reportFilePaths) ? 'failed' : 'partial');
 
             $execution->update([
                 'status' => $status,
@@ -102,7 +101,7 @@ readonly class ScheduledReportExecutionService
                     'generated' => array_map(fn($r) => [
                         'device_code' => $r['device_code'],
                         'device_name' => $r['device_name'],
-                    ], $generatedReports),
+                    ], $reportFilePaths),
                     'failed' => $failedDevices,
                 ],
             ]);
@@ -127,13 +126,11 @@ readonly class ScheduledReportExecutionService
     /**
      * Send reports using Laravel notifications
      */
-    private function sendReports(ScheduledReport $scheduledReport, array $reports): void
+    private function sendReports(ScheduledReport $scheduledReport, array $reportFilePaths): void
     {
         try {
             // Get users by email
             $recipients = User::whereIn('email', $scheduledReport->recipient_emails)->get();
-
-            Log::debug("Recipients: ", $recipients->toArray());
 
             if ($recipients->isEmpty()) {
                 Log::warning('No valid recipients found for scheduled report', [
@@ -143,16 +140,20 @@ readonly class ScheduledReportExecutionService
                 return;
             }
 
-            // Send using Laravel notifications
-            Notification::send(
-                $recipients,
-                new ScheduledReportNotification(
-                    scheduledReport: $scheduledReport,
-                    reports: $reports,
-                    successCount: count(array_filter($reports, fn($r) => !isset($r['error']))),
-                    failureCount: count(array_filter($reports, fn($r) => isset($r['error'])))
-                )
+            // Create notification with minimal data
+            $notification = new ScheduledReportNotification(
+                scheduledReportId: $scheduledReport->id,
+                reportName: $scheduledReport->name,
+                frequency: $scheduledReport->frequency->label(),
+                format: $scheduledReport->format->label(),
+                dataFormation: $scheduledReport->data_formation->label(),
+                reportFilePaths: $reportFilePaths,
+                successCount: count($reportFilePaths),
+                failureCount: 0
             );
+
+            // Send using Laravel notifications
+            Notification::send($recipients, $notification);
 
             Log::info('Scheduled report notifications sent', [
                 'scheduled_report_id' => $scheduledReport->id,

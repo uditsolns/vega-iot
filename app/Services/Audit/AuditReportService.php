@@ -4,7 +4,9 @@ namespace App\Services\Audit;
 
 use App\Models\AuditReport;
 use App\Models\User;
+use App\Notifications\AuditReportNotification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Notification;
 use Mpdf\MpdfException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -59,5 +61,52 @@ readonly class AuditReportService
     public function generateReport(AuditReport $report): string
     {
         return $this->generatorService->generate($report);
+    }
+
+    /**
+     * Generate and send audit report via email
+     * @throws MpdfException
+     */
+    public function generateAndSend(AuditReport $report, array $recipientEmails = []): string
+    {
+        // Generate PDF
+        $pdfContent = $this->generateReport($report);
+
+        // Save to temporary storage
+        $filename = "{$report->name}_{$report->id}.pdf";
+        $tempPath = storage_path("app/temp/audit-reports/{$filename}");
+
+        // Ensure directory exists
+        if (!is_dir(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+
+        file_put_contents($tempPath, $pdfContent);
+
+        // Get recipients - default to report generator if none provided
+        $emails = !empty($recipientEmails) ? $recipientEmails : [$report->generatedBy->email];
+        $recipients = User::whereIn('email', $emails)->get();
+
+        if ($recipients->isNotEmpty()) {
+            // Create notification
+            $notification = new AuditReportNotification(
+                auditReportId: $report->id,
+                reportName: $report->name,
+                reportType: $report->type->label(),
+                pdfPath: $tempPath,
+                generatedById: $report->generated_by,
+                generatedByName: "{$report->generatedBy->first_name} {$report->generatedBy->last_name}"
+            );
+
+            // Send notification
+            Notification::send($recipients, $notification);
+        }
+
+        // Cleanup temp file after sending
+        if (file_exists($tempPath)) {
+            @unlink($tempPath);
+        }
+
+        return $pdfContent;
     }
 }

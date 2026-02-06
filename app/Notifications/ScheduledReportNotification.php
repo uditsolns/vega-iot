@@ -13,16 +13,20 @@ class ScheduledReportNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-//    public int $tries = 3;
-//    public array $backoff = [10, 30, 60];
-
+    /**
+     * Store only necessary data, not full report objects
+     */
     public function __construct(
-        public readonly ScheduledReport $scheduledReport,
-        public readonly array $reports,
+        public readonly int $scheduledReportId,
+        public readonly string $reportName,
+        public readonly string $frequency,
+        public readonly string $format,
+        public readonly string $dataFormation,
+        public readonly array $reportFilePaths, // Just the file paths, not the content
         public readonly int $successCount = 0,
         public readonly int $failureCount = 0
     ) {
-        $this->onQueue(config('notifications', 'notifications'));
+//        $this->onQueue(config('notifications.queue', 'notifications'));
     }
 
     public function via($notifiable): array
@@ -32,26 +36,34 @@ class ScheduledReportNotification extends Notification implements ShouldQueue
 
     public function toMsgClubEmail($notifiable): MsgClubEmailMessage
     {
+        // Load the scheduled report fresh from database
+        $scheduledReport = ScheduledReport::find($this->scheduledReportId);
+
         $message = (new MsgClubEmailMessage)
-            ->subject("Scheduled Report: {$this->scheduledReport->name}")
-            ->view('emails.scheduled-reports.report', [
-                'scheduledReport' => $this->scheduledReport,
-                'reports' => $this->reports,
+            ->subject("Scheduled Report: {$this->reportName}")
+            ->view('emails.reports.scheduled-report', [
+                'scheduledReport' => $scheduledReport,
                 'successCount' => $this->successCount,
                 'failureCount' => $this->failureCount,
                 'user' => $notifiable,
             ]);
 
         // Attach all PDF reports
-        foreach ($this->reports as $report) {
-            if (isset($report['pdf_path']) && file_exists($report['pdf_path'])) {
-                $message->attach(
-                    $report['pdf_path'],
-                    $report['filename'] ?? basename($report['pdf_path'])
-                );
+        foreach ($this->reportFilePaths as $report) {
+            if (isset($report['path']) && file_exists($report['path'])) {
+                $message->attach($report['path'], $report['filename'] ?? null);
             }
         }
 
         return $message;
+    }
+
+    /**
+     * This notification should NOT be stored in database
+     * Return null to skip database storage
+     */
+    public function toDatabase($notifiable): ?array
+    {
+        return null;
     }
 }

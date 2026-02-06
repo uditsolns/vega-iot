@@ -63,8 +63,19 @@ class ReadingIngestionService
             "status" => DeviceStatus::Online,
         ]);
 
-        // Dispatch ReadingReceived event
-        event(new ReadingReceived($device, $readingData));
+        // Dispatch ReadingReceived event with only IDs and primitives
+        event(new ReadingReceived(
+            deviceId: $device->id,
+            recordedAt: $reading->recorded_at->toDateTimeString(),
+            readingData: [
+                'temperature' => $reading->temperature,
+                'humidity' => $reading->humidity,
+                'temp_probe' => $reading->temp_probe,
+                'battery_voltage' => $reading->battery_voltage,
+                'battery_percentage' => $reading->battery_percentage,
+                'wifi_signal_strength' => $reading->wifi_signal_strength,
+            ]
+        ));
 
         return $reading;
     }
@@ -84,6 +95,7 @@ class ReadingIngestionService
         $hierarchy = $this->denormalizeHierarchy($device);
 
         $insertData = [];
+        $eventsToDispatch = [];
 
         foreach ($readings as $index => $data) {
             try {
@@ -111,6 +123,18 @@ class ReadingIngestionService
                 ];
 
                 $insertData[] = $reading;
+
+                // Store event data (primitives only)
+                $eventsToDispatch[] = [
+                    'recorded_at' => $data["recorded_at"],
+                    'temperature' => $data["temperature"] ?? null,
+                    'humidity' => $data["humidity"] ?? null,
+                    'temp_probe' => $data["temp_probe"] ?? null,
+                    'battery_voltage' => $data["battery_voltage"] ?? null,
+                    'battery_percentage' => $data["battery_percentage"] ?? null,
+                    'wifi_signal_strength' => $data["wifi_signal_strength"] ?? null,
+                ];
+
                 $results["success"]++;
             } catch (ValidationException $e) {
                 $results["failed"]++;
@@ -131,9 +155,13 @@ class ReadingIngestionService
                 "status" => DeviceStatus::Online,
             ]);
 
-            // Dispatch events for each reading
-            foreach ($insertData as $reading) {
-                event(new ReadingReceived($device, $reading));
+            // Dispatch events for each reading (with primitives only)
+            foreach ($eventsToDispatch as $eventData) {
+                event(new ReadingReceived(
+                    deviceId: $device->id,
+                    recordedAt: $eventData['recorded_at'],
+                    readingData: $eventData
+                ));
             }
         }
 

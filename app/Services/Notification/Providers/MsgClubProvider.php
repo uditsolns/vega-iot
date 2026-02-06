@@ -23,11 +23,6 @@ class MsgClubProvider
 
     /**
      * Send SMS via MsgClub API
-     *
-     * @param string $mobile Mobile number with country code
-     * @param string $message SMS message content
-     * @param string|null $templateId Template ID registered with provider
-     * @return array ['success' => bool, 'reference' => string|null, 'response' => array, 'error' => string|null]
      */
     public function sendSms(
         string $mobile,
@@ -52,7 +47,6 @@ class MsgClubProvider
 
             Log::info("SMS Message: " . $message);
             Log::info("SMS params: ", $params);
-            Log::info("SMS endpoint: ". $endpoint);
 
             $response = Http::timeout($this->smsConfig["timeout"])
                 ->withHeaders(["Cache-Control" => "no-cache"])
@@ -111,12 +105,13 @@ class MsgClubProvider
     }
 
     /**
-     * Send Email via MsgClub API
+     * Send Email via MsgClub API with optional attachments
      *
      * @param string $email Recipient email address
      * @param string $name Recipient name
      * @param string $subject Email subject
      * @param string $htmlContent Email HTML content
+     * @param array $attachments Array of attachment file paths
      * @return array ['success' => bool, 'reference' => string|null, 'response' => array, 'error' => string|null]
      */
     public function sendEmail(
@@ -124,6 +119,7 @@ class MsgClubProvider
         string $name,
         string $subject,
         string $htmlContent,
+        array $attachments = []
     ): array {
         try {
             $endpoint = "$this->baseUrl/sendEmail/email";
@@ -135,7 +131,7 @@ class MsgClubProvider
                 "subject" => $subject,
                 "fromEmail" => $this->emailConfig["from_email"],
                 "fromName" => $this->emailConfig["from_name"],
-                "displayName" => $this->emailConfig["display_name"],
+                "displayName" => $this->emailConfig["display_name"] ?? $this->emailConfig["from_name"],
                 "toEmailSet" => [
                     [
                         "email" => $email,
@@ -143,6 +139,19 @@ class MsgClubProvider
                     ],
                 ],
             ];
+
+            // Add attachments if provided
+            if (!empty($attachments)) {
+                $payload["attachmentType"] = "1"; // 1 for base64
+                $payload["attachments"] = $this->prepareAttachments($attachments);
+            }
+
+            Log::info("Sending email via MsgClub", [
+                'to' => $email,
+                'subject' => $subject,
+                'has_attachments' => !empty($attachments),
+                'attachment_count' => count($attachments),
+            ]);
 
             $response = Http::timeout($this->emailConfig["timeout"])
                 ->withHeaders([
@@ -200,12 +209,75 @@ class MsgClubProvider
     }
 
     /**
-     * Send Voice call via MsgClub API
-     * TODO: Implement when voice API details are available
+     * Prepare attachments for MsgClub API
+     * Convert file paths to base64 encoded data
      *
-     * @param string $mobile Mobile number with country code
-     * @param string $message Voice message content
-     * @return array ['success' => bool, 'reference' => string|null, 'response' => array, 'error' => string|null]
+     * @param array $attachmentPaths Array of file paths
+     * @return array Array of attachment objects for API
+     */
+    private function prepareAttachments(array $attachmentPaths): array
+    {
+        $attachments = [];
+
+        foreach ($attachmentPaths as $path) {
+            if (!file_exists($path)) {
+                Log::warning("Attachment file not found", ['path' => $path]);
+                continue;
+            }
+
+            try {
+                $fileContent = file_get_contents($path);
+                $base64Content = base64_encode($fileContent);
+                $fileName = basename($path);
+                // $mimeType = $this->getMimeType($path);
+                $mimeType = "application/pdf";
+
+                $attachments[] = [
+                    'fileType' => $mimeType,
+                    'fileName' => $fileName,
+                    'fileData' => $base64Content,
+                ];
+
+                Log::info("Attachment prepared", [
+                    'file' => $fileName,
+                    'mime' => $mimeType,
+                    'size' => strlen($fileContent),
+                ]);
+            } catch (Exception $e) {
+                Log::error("Failed to prepare attachment", [
+                    'path' => $path,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $attachments;
+    }
+
+    /**
+     * Get MIME type for file
+     */
+//    private function getMimeType(string $path): string
+//    {
+//        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+//
+//        return match ($extension) {
+//            'pdf' => 'application/pdf',
+//            'txt' => 'text/plain',
+//            'csv' => 'text/csv',
+//            'doc' => 'application/msword',
+//            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+//            'xls' => 'application/vnd.ms-excel',
+//            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+//            'jpg', 'jpeg' => 'image/jpeg',
+//            'png' => 'image/png',
+//            'gif' => 'image/gif',
+//            default => mime_content_type($path) ?: 'application/octet-stream',
+//        };
+//    }
+
+    /**
+     * Send Voice call via MsgClub API
      */
     public function sendVoice(string $mobile, string $message): array
     {

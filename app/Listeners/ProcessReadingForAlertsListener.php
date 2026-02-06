@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\ReadingReceived;
+use App\Models\Device;
 use App\Models\DeviceReading;
 use App\Services\Alert\AlertLifecycleService;
 use Exception;
@@ -31,19 +32,26 @@ class ProcessReadingForAlertsListener implements ShouldQueue
     public function handle(ReadingReceived $event): void
     {
         try {
-            // Get the device and reading data
-            $device = $event->device;
-            $readingData = $event->reading;
+            // Load the device fresh from database
+            $device = Device::with(['currentConfiguration', 'area.hub.location'])
+                ->find($event->deviceId);
+
+            if (!$device) {
+                Log::warning('Device not found for alert processing', [
+                    'device_id' => $event->deviceId,
+                ]);
+                return;
+            }
 
             // Find the DeviceReading record
-            $reading = DeviceReading::where('device_id', $device->id)
-                ->where('recorded_at', $readingData['recorded_at'])
+            $reading = DeviceReading::where('device_id', $event->deviceId)
+                ->where('recorded_at', $event->recordedAt)
                 ->first();
 
             if (!$reading) {
                 Log::warning('DeviceReading not found for alert processing', [
-                    'device_id' => $device->id,
-                    'recorded_at' => $readingData['recorded_at'],
+                    'device_id' => $event->deviceId,
+                    'recorded_at' => $event->recordedAt,
                 ]);
                 return;
             }
@@ -52,7 +60,7 @@ class ProcessReadingForAlertsListener implements ShouldQueue
             $this->alertLifecycleService->evaluateAndProcess($device, $reading);
         } catch (Exception $e) {
             Log::error('Alert processing listener failed', [
-                'device_id' => $event->device->id,
+                'device_id' => $event->deviceId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -68,7 +76,7 @@ class ProcessReadingForAlertsListener implements ShouldQueue
     public function failed(ReadingReceived $event, \Throwable $exception): void
     {
         Log::error('Alert processing listener permanently failed', [
-            'device_id' => $event->device->id,
+            'device_id' => $event->deviceId,
             'error' => $exception->getMessage(),
         ]);
     }

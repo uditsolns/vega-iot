@@ -89,17 +89,17 @@ readonly class AlertLifecycleService
         if (!$existingAlert) {
             // No existing alert - create new alert and notify
             $alert = $this->createAlert($device, $violation);
-            $this->sendNotification($alert, AlertTriggeredNotification::class);
+            $this->sendAlertTriggeredNotification($alert);
         } elseif ($existingAlert->status === AlertStatus::Active) {
             // Active alert still violated - update and notify
             $this->updateAlert($existingAlert, $violation);
-            $this->sendNotification($existingAlert, AlertTriggeredNotification::class);
+            $this->sendAlertTriggeredNotification($existingAlert);
         } elseif ($existingAlert->status === AlertStatus::Acknowledged) {
             // Acknowledged alert still violated - update and notify based on interval
             $this->updateAlert($existingAlert, $violation);
 
             if ($this->shouldSendNotification($existingAlert, $device->area)) {
-                $this->sendNotification($existingAlert, AlertTriggeredNotification::class);
+                $this->sendAlertTriggeredNotification($existingAlert);
             }
         }
     }
@@ -117,7 +117,7 @@ readonly class AlertLifecycleService
 
             // Send notification if enabled
             if ($device->area && $device->area->alert_back_in_range_enabled) {
-                $this->sendNotification($existingAlert, AlertBackInRangeNotification::class);
+                $this->sendBackInRangeNotification($existingAlert);
             }
 
             Log::info("Alert auto-resolved - sensor back in range", [
@@ -195,9 +195,9 @@ readonly class AlertLifecycleService
     }
 
     /**
-     * Send notification using Laravel's notification system
+     * Send alert triggered notification
      */
-    private function sendNotification(Alert $alert, string $notificationClass): void
+    private function sendAlertTriggeredNotification(Alert $alert): void
     {
         try {
             $users = $this->getUsersToNotify($alert->device->area);
@@ -210,8 +210,16 @@ readonly class AlertLifecycleService
                 return;
             }
 
-            // Create notification instance
-            $notification = new $notificationClass($alert);
+            // Create notification with primitive data only
+            $notification = new AlertTriggeredNotification(
+                alertId: $alert->id,
+                deviceId: $alert->device_id,
+                severity: $alert->severity->value,
+                sensorType: $alert->type->value,
+                triggerValue: (float) $alert->trigger_value,
+                reason: $alert->reason,
+                startedAt: $alert->started_at->toDateTimeString()
+            );
 
             // Send to all users
             Notification::send($users, $notification);
@@ -222,12 +230,44 @@ readonly class AlertLifecycleService
             Log::info('Alert notifications sent', [
                 'alert_id' => $alert->id,
                 'users_count' => $users->count(),
-                'notification_type' => $notificationClass,
             ]);
         } catch (Exception $e) {
             Log::error('Failed to send alert notification', [
                 'alert_id' => $alert->id,
-                'notification_type' => $notificationClass,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Send back in range notification
+     */
+    private function sendBackInRangeNotification(Alert $alert): void
+    {
+        try {
+            $users = $this->getUsersToNotify($alert->device->area);
+
+            if ($users->isEmpty()) {
+                return;
+            }
+
+            $notification = new AlertBackInRangeNotification(
+                alertId: $alert->id,
+                deviceId: $alert->device_id,
+                deviceCode: $alert->device->device_code,
+                currentValue: (float) $alert->trigger_value,
+                sensorType: $alert->type->value
+            );
+
+            Notification::send($users, $notification);
+
+            Log::info('Back in range notifications sent', [
+                'alert_id' => $alert->id,
+                'users_count' => $users->count(),
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to send back in range notification', [
+                'alert_id' => $alert->id,
                 'error' => $e->getMessage(),
             ]);
         }
@@ -275,7 +315,22 @@ readonly class AlertLifecycleService
 
         DB::transaction(function () use ($alert, $user, $comment) {
             $alert->acknowledge($user, $comment);
-            $this->sendNotification($alert, AlertAcknowledgedNotification::class);
+
+            // Send notification
+            $users = $this->getUsersToNotify($alert->device->area);
+
+            if ($users->isNotEmpty()) {
+                $notification = new AlertAcknowledgedNotification(
+                    alertId: $alert->id,
+                    deviceId: $alert->device_id,
+                    deviceCode: $alert->device->device_code,
+                    acknowledgedBy: $user->id,
+                    acknowledgedByName: "{$user->first_name} {$user->last_name}",
+                    acknowledgedAt: $alert->acknowledged_at->toDateTimeString()
+                );
+
+                Notification::send($users, $notification);
+            }
         });
 
         Log::info("Alert acknowledged", [
@@ -305,7 +360,22 @@ readonly class AlertLifecycleService
 
         DB::transaction(function () use ($alert, $user, $comment) {
             $alert->resolve($user, $comment, false);
-            $this->sendNotification($alert, AlertResolvedNotification::class);
+
+            // Send notification
+            $users = $this->getUsersToNotify($alert->device->area);
+
+            if ($users->isNotEmpty()) {
+                $notification = new AlertResolvedNotification(
+                    alertId: $alert->id,
+                    deviceId: $alert->device_id,
+                    deviceCode: $alert->device->device_code,
+                    resolvedBy: $user->id,
+                    resolvedByName: "{$user->first_name} {$user->last_name}",
+                    resolvedAt: $alert->resolved_at->toDateTimeString()
+                );
+
+                Notification::send($users, $notification);
+            }
         });
 
         Log::info("Alert manually resolved", [

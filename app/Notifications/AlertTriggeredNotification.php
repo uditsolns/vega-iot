@@ -7,6 +7,7 @@ use App\Channels\MsgClubSmsChannel;
 use App\Channels\MsgClubVoiceChannel;
 use App\Enums\AlertSeverity;
 use App\Models\Alert;
+use App\Models\Device;
 use App\Notifications\Messages\MsgClubEmailMessage;
 use App\Notifications\Messages\MsgClubSmsMessage;
 use App\Notifications\Messages\MsgClubVoiceMessage;
@@ -18,16 +19,20 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-//    public int $tries = 3;
-//    public array $backoff = [10, 30, 60];
-//    public int $timeout = 60;
-
+    /**
+     * Store only IDs and primitive data, not Eloquent models
+     */
     public function __construct(
-        public readonly Alert $alert,
+        public readonly int $alertId,
+        public readonly int $deviceId,
+        public readonly string $severity,
+        public readonly string $sensorType,
+        public readonly float $triggerValue,
+        public readonly string $reason,
+        public readonly string $startedAt,
         public readonly string $event = 'triggered'
     ) {
-        // Set queue
-        $this->onQueue(config('notifications.queue', 'notifications'));
+//        $this->onQueue(config('notifications.queue', 'notifications'));
     }
 
     /**
@@ -35,13 +40,15 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
      */
     public function via($notifiable): array
     {
-        $area = $this->alert->device->area;
+        $channels = ['database']; // Always store in database
+
+        // Get area configuration - load fresh from database
+        $device = Device::with('area')->find($this->deviceId);
+        $area = $device?->area;
 
         if (!$area) {
-            return [];
+            return $channels;
         }
-
-        $channels = [];
 
         // Check if email is enabled
         if ($area->alert_email_enabled &&
@@ -56,7 +63,7 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
         }
 
         // Voice only for critical alerts
-        if ($this->alert->severity === AlertSeverity::Critical &&
+        if ($this->severity === AlertSeverity::Critical->value &&
             $area->alert_voice_enabled &&
             config('notifications.channels.voice.enabled', false)) {
             $channels[] = MsgClubVoiceChannel::class;
@@ -70,15 +77,17 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
      */
     public function toMsgClubSms($notifiable): MsgClubSmsMessage
     {
+        $device = Device::find($this->deviceId);
+
         return (new MsgClubSmsMessage)
             ->template('alert_triggered')
             ->data([
-                'severity' => ucfirst($this->alert->severity->value),
-                'code' => $this->alert->device->device_code,
-                'device_code' => $this->alert->device->device_code,
-                'value' => number_format($this->alert->trigger_value, 1),
-                'location' => $this->getLocationPath(),
-                'area' => $this->alert->device->area?->name ?? 'N/A',
+                'severity' => ucfirst($this->severity),
+                'code' => $device->device_code,
+                'device_code' => $device->device_code,
+                'value' => number_format($this->triggerValue, 1),
+                'location' => $this->getLocationPath($device),
+                'area' => $device->area?->name ?? 'N/A',
             ]);
     }
 
@@ -87,17 +96,21 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
      */
     public function toMsgClubEmail($notifiable): MsgClubEmailMessage
     {
-        $severity = ucfirst($this->alert->severity->value);
-        $deviceCode = $this->alert->device->device_code;
+        $device = Device::with([
+            'area.hub.location',
+            'currentConfiguration'
+        ])->find($this->deviceId);
+
+        $alert = Alert::find($this->alertId);
 
         return (new MsgClubEmailMessage)
-            ->subject("{$severity} Alert: Device {$deviceCode}")
+            ->subject(ucfirst($this->severity) . " Alert: Device {$device->device_code}")
             ->view('emails.alerts.triggered', [
-                'alert' => $this->alert,
+                'alert' => $alert,
                 'user' => $notifiable,
-                'device' => $this->alert->device,
-                'area' => $this->alert->device->area,
-                'data' => $this->getTemplateData(),
+                'device' => $device,
+                'area' => $device->area,
+                'data' => $this->getTemplateData($device, $alert),
             ]);
     }
 
@@ -106,22 +119,45 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
      */
     public function toMsgClubVoice($notifiable): MsgClubVoiceMessage
     {
+        $device = Device::find($this->deviceId);
+
         return (new MsgClubVoiceMessage)
             ->template('alert_triggered')
             ->data([
-                'severity' => ucfirst($this->alert->severity->value),
-                'code' => $this->alert->device->device_code,
-                'value' => number_format($this->alert->trigger_value, 1),
-                'location' => $this->getLocationPath(),
+                'severity' => ucfirst($this->severity),
+                'code' => $device->device_code,
+                'value' => number_format($this->triggerValue, 1),
+                'location' => $this->getLocationPath($device),
             ]);
+    }
+
+    /**
+     * Get the array representation for database storage
+     */
+    public function toArray($notifiable): array
+    {
+        $device = Device::with('area.hub.location')->find($this->deviceId);
+
+        return [
+            'alert_id' => $this->alertId,
+            'device_id' => $this->deviceId,
+            'device_code' => $device->device_code,
+            'device_name' => $device->device_name ?? $device->device_code,
+            'severity' => $this->severity,
+            'sensor_type' => $this->sensorType,
+            'trigger_value' => $this->triggerValue,
+            'reason' => $this->reason,
+            'location' => $this->getLocationPath($device),
+            'started_at' => $this->startedAt,
+            'event' => $this->event,
+        ];
     }
 
     /**
      * Get location path for the alert
      */
-    protected function getLocationPath(): string
+    protected function getLocationPath($device): string
     {
-        $device = $this->alert->device;
         $area = $device->area;
 
         if (!$area) {
@@ -138,26 +174,25 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
     /**
      * Get template data for emails
      */
-    protected function getTemplateData(): array
+    protected function getTemplateData($device, $alert): array
     {
-        $device = $this->alert->device;
         $area = $device->area;
         $config = $device->currentConfiguration;
 
         return [
-            'severity' => $this->alert->severity->value,
+            'severity' => $this->severity,
             'code' => $device->device_code,
             'device_code' => $device->device_code,
             'device_name' => $device->device_name ?? $device->device_code,
             'location' => $area?->hub?->location?->name ?? 'N/A',
             'hub' => $area?->hub?->name ?? 'N/A',
             'area' => $area?->name ?? 'N/A',
-            'value' => $this->alert->trigger_value,
-            'threshold' => $config?->{$this->alert->threshold_breached} ?? 'N/A',
-            'threshold_type' => $this->alert->threshold_breached,
-            'sensor_type' => $this->alert->type->value,
-            'datetime' => $this->alert->started_at->format('Y-m-d H:i:s'),
-            'alert_message' => $this->alert->reason,
+            'value' => $this->triggerValue,
+            'threshold' => $config?->{$alert->threshold_breached} ?? 'N/A',
+            'threshold_type' => $alert->threshold_breached,
+            'sensor_type' => $this->sensorType,
+            'datetime' => $this->startedAt,
+            'alert_message' => $this->reason,
         ];
     }
 }

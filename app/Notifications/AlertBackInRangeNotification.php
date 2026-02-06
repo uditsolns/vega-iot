@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Channels\MsgClubEmailChannel;
 use App\Channels\MsgClubSmsChannel;
 use App\Models\Alert;
+use App\Models\Device;
 use App\Notifications\Messages\MsgClubEmailMessage;
 use App\Notifications\Messages\MsgClubSmsMessage;
 use Illuminate\Bus\Queueable;
@@ -15,24 +16,26 @@ class AlertBackInRangeNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-//    public int $tries = 3;
-//    public array $backoff = [10, 30, 60];
-
     public function __construct(
-        public readonly Alert $alert
+        public readonly int $alertId,
+        public readonly int $deviceId,
+        public readonly string $deviceCode,
+        public readonly float $currentValue,
+        public readonly string $sensorType
     ) {
-        $this->onQueue(config('notifications.queue', 'notifications'));
+//        $this->onQueue(config('notifications.queue', 'notifications'));
     }
 
     public function via($notifiable): array
     {
-        $area = $this->alert->device->area;
+        $channels = ['database'];
+
+        $device = Device::with('area')->find($this->deviceId);
+        $area = $device?->area;
 
         if (!$area || !$area->alert_back_in_range_enabled) {
-            return [];
+            return $channels;
         }
-
-        $channels = [];
 
         if ($area->alert_email_enabled &&
             config('notifications.channels.email.enabled', true)) {
@@ -52,34 +55,45 @@ class AlertBackInRangeNotification extends Notification implements ShouldQueue
         return (new MsgClubSmsMessage)
             ->template('alert_back_in_range')
             ->data([
-                'code' => $this->alert->device->device_code,
+                'code' => $this->deviceCode,
             ]);
     }
 
     public function toMsgClubEmail($notifiable): MsgClubEmailMessage
     {
+        $alert = Alert::with('device.area.hub.location')->find($this->alertId);
+        $device = $alert->device;
+
         return (new MsgClubEmailMessage)
-            ->subject("Device Back in Range: {$this->alert->device->device_code}")
+            ->subject("Device Back in Range: {$this->deviceCode}")
             ->view('emails.alerts.back-in-range', [
-                'alert' => $this->alert,
+                'alert' => $alert,
                 'user' => $notifiable,
-                'device' => $this->alert->device,
-                'area' => $this->alert->device->area,
-                'data' => $this->getTemplateData(),
+                'device' => $device,
+                'area' => $device->area,
+                'data' => [
+                    'code' => $device->device_code,
+                    'device_name' => $device->device_name ?? $device->device_code,
+                    'location' => $device->area?->hub?->location?->name ?? 'N/A',
+                    'area' => $device->area?->name ?? 'N/A',
+                    'value' => $this->currentValue,
+                ],
             ]);
     }
 
-    protected function getTemplateData(): array
+    public function toArray($notifiable): array
     {
-        $device = $this->alert->device;
-        $area = $device->area;
+        $device = Device::with('area.hub.location')->find($this->deviceId);
 
         return [
-            'code' => $device->device_code,
-            'device_name' => $device->device_name ?? $device->device_code,
-            'location' => $area?->hub?->location?->name ?? 'N/A',
-            'area' => $area?->name ?? 'N/A',
-            'value' => $this->alert->trigger_value,
+            'alert_id' => $this->alertId,
+            'device_id' => $this->deviceId,
+            'device_code' => $this->deviceCode,
+            'device_name' => $device->device_name ?? $this->deviceCode,
+            'current_value' => $this->currentValue,
+            'sensor_type' => $this->sensorType,
+            'location' => $device->area?->hub?->location?->name ?? 'N/A',
+            'event' => 'back_in_range',
         ];
     }
 }

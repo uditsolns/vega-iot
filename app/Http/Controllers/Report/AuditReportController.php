@@ -42,7 +42,7 @@ class AuditReportController extends Controller
             $request->user()
         );
 
-        $pdfContent = $this->auditReportService->generateReport($report);
+        $pdfContent = $this->auditReportService->generateAndSend($report);
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
