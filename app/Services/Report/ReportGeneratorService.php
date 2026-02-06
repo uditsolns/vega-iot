@@ -20,7 +20,7 @@ readonly class ReportGeneratorService
 
     /**
      * Generate report from a Reportable entity
-     * @throws Exception
+     * @throws MpdfException
      */
     public function generateFromReportable(ReportableInterface $reportable): string
     {
@@ -30,6 +30,7 @@ readonly class ReportGeneratorService
 
     /**
      * Generate report from a DTO
+     * @throws MpdfException
      */
     public function generate(ReportGenerationDTO $dto): string
     {

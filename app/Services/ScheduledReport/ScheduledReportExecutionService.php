@@ -37,6 +37,9 @@ readonly class ScheduledReportExecutionService
             $fromDatetime = $this->getFromDatetime($scheduledReport);
             $toDatetime = now($scheduledReport->timezone);
 
+            Log::debug("From Date: ". $fromDatetime->toDateTimeString());
+            Log::debug("To Date: ". $toDatetime->toDateTimeString());
+
             foreach ($devices as $device) {
                 try {
                     // Create adapter for this device
@@ -86,11 +89,13 @@ readonly class ScheduledReportExecutionService
                 }
             }
 
+            Log::debug("Scheduled Generated Device Reports: ", $reportFilePaths);
+
             if (!empty($reportFilePaths)) {
                 $this->sendReports($scheduledReport, $reportFilePaths);
 
                 // Cleanup temp files after sending
-                $this->cleanupTempFiles($scheduledReport->id);
+//                $this->cleanupTempFiles($scheduledReport->id);
             }
 
             $status = empty($failedDevices) ? 'success' : (empty($reportFilePaths) ? 'failed' : 'partial');
@@ -143,13 +148,7 @@ readonly class ScheduledReportExecutionService
             // Create notification with minimal data
             $notification = new ScheduledReportNotification(
                 scheduledReportId: $scheduledReport->id,
-                reportName: $scheduledReport->name,
-                frequency: $scheduledReport->frequency->label(),
-                format: $scheduledReport->format->label(),
-                dataFormation: $scheduledReport->data_formation->label(),
                 reportFilePaths: $reportFilePaths,
-                successCount: count($reportFilePaths),
-                failureCount: 0
             );
 
             // Send using Laravel notifications

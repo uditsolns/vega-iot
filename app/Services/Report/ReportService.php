@@ -4,8 +4,10 @@ namespace App\Services\Report;
 
 use App\Models\Report;
 use App\Models\User;
+use App\Notifications\ReportGeneratedNotification;
 use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Mpdf\MpdfException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -44,9 +46,11 @@ readonly class ReportService
     /**
      * Create a new report record
      */
-    public function create(array $data): Report
+    public function create(array $data, User $user): Report
     {
         // Create report record
+        $data['generated_by'] = $user->id;
+        $data['company_id'] = $user->company_id;
         $report = Report::create($data);
 
         // Audit log
@@ -59,15 +63,45 @@ readonly class ReportService
             ])
             ->log("Generated report \"$report->name\"");
 
-        return $report;
+        return $report->fresh(['generatedBy']);
     }
 
     /**
-     * Generate report file (PDF/CSV) from a Report model
-     * @throws Exception
+     * Generate report file
+     * @throws MpdfException
      */
-    public function generateReport(Report $report): string
+    public function generate(Report $report): string
     {
         return $this->reportGenerator->generateFromReportable($report);
+    }
+
+    /**
+     * Generate report file and send notification
+     * @throws MpdfException
+     */
+    public function generateAndSend(Report $report): string
+    {
+        $pdfContent = $this->reportGenerator->generateFromReportable($report);
+
+        // Save PDF to temp storage for notification attachment
+        $filename = "{$report->name}_{$report->id}.pdf";
+        $tempPath = storage_path("app/temp/reports/{$filename}");
+
+        // Ensure directory exists
+        if (!is_dir(dirname($tempPath))) {
+            mkdir(dirname($tempPath), 0755, true);
+        }
+
+        file_put_contents($tempPath, $pdfContent);
+
+        // Send notification to report generator
+        $report->generatedBy->notify(
+            new ReportGeneratedNotification(
+                reportId: $report->id,
+                pdfPath: $tempPath,
+            )
+        );
+
+        return $pdfContent;
     }
 }

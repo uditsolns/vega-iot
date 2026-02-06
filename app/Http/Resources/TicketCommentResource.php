@@ -21,9 +21,6 @@ class TicketCommentResource extends JsonResource
 
             // Conditional
             "user" => new UserResource($this->whenLoaded("user")),
-            "attachments" => TicketAttachmentResource::collection(
-                $this->whenLoaded("attachments"),
-            ),
         ];
     }
 }

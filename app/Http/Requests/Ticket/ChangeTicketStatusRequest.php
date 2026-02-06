@@ -24,7 +24,6 @@ class ChangeTicketStatusRequest extends FormRequest
     {
         return [
             'status.required' => 'The status field is required.',
-            'status.enum' => 'The selected status is invalid.',
         ];
     }
 }

@@ -61,7 +61,7 @@ class Report extends Model implements ReportableInterface
             'data_formation' => ReportDataFormation::class,
             'from_datetime' => 'datetime',
             'to_datetime' => 'datetime',
-            'generated_at' => 'timestamp',
+            'generated_at' => 'datetime',
         ];
     }
 

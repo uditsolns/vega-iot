@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Ticket;
 
+use App\Enums\TicketPriority;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CreateTicketRequest extends FormRequest
 {
@@ -17,7 +19,7 @@ class CreateTicketRequest extends FormRequest
             "subject" => ["required", "string", "max:255"],
             "description" => ["required", "string"],
             "reason" => ["nullable", "string", "max:100"],
-            "priority" => ["required", "in:low,medium,high,critical"],
+            "priority" => ["required", Rule::enum(TicketPriority::class)],
             "device_id" => ["nullable", "integer", "exists:devices,id"],
             "location_id" => ["nullable", "integer", "exists:locations,id"],
             "area_id" => ["nullable", "integer", "exists:areas,id"],
@@ -34,8 +36,6 @@ class CreateTicketRequest extends FormRequest
             "reason.max" =>
                 "The reason may not be greater than 100 characters.",
             "priority.required" => "The priority field is required.",
-            "priority.in" =>
-                "The selected priority is invalid. Must be one of: low, medium, high, critical.",
             "device_id.exists" => "The selected device does not exist.",
             "location_id.exists" => "The selected location does not exist.",
             "area_id.exists" => "The selected area does not exist.",

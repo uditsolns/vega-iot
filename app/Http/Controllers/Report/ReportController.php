@@ -8,6 +8,8 @@ use App\Http\Resources\ReportResource;
 use App\Models\Report;
 use App\Services\Report\ReportService;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Mpdf\MpdfException;
 
 class ReportController extends Controller
 {
@@ -25,49 +27,33 @@ class ReportController extends Controller
         return $this->collection(ReportResource::collection($reports));
     }
 
-    public function store(CreateReportRequest $request)
+    /**
+     * @throws MpdfException
+     */
+    public function store(CreateReportRequest $request): Response
     {
         $this->authorize("create", Report::class);
 
-        $data = $request->validated();
-        $data['generated_by'] = $request->user()->id;
-        $data['company_id'] = $request->user()->company_id;
-
         // Create report record
-        $report = $this->reportService->create($data);
+        $report = $this->reportService->create(
+            $request->validated(),
+            $request->user(),
+        );
 
-        return $this->generate($report);
+        $pdfContent = $this->reportService->generateAndSend($report);
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $report->name . '.pdf"',
+        ]);
     }
 
+    /**
+     * @throws MpdfException
+     */
     public function download(Report $report) {
         $this->authorize("viewAny", Report::class);
 
-        return $this->generate($report);
-    }
-
-    public function generate(Report $report)
-    {
-        try {
-            // Generate PDF file
-            $pdfContent = $this->reportService->generateReport($report);
-
-            // Return file download response
-            return response($pdfContent, 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $report->name . '.pdf"',
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Report generation failed', [
-                'report_id' => $report->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return $this->error(
-                'Failed to generate report: ' . $e->getMessage(),
-                500
-            );
-        }
+        return $this->reportService->generate($report);
     }
 }

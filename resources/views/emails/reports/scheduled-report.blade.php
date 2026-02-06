@@ -20,7 +20,7 @@
     </div>
 
     <div class="content">
-        <p>Hello,</p>
+        <p>Hello {{ $user->name }},</p>
 
         <p>Please find attached the scheduled reports for the following devices:</p>
 

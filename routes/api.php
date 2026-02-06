@@ -273,13 +273,9 @@ Route::prefix("v1")->group(function () {
             });
 
         // Tickets
+        Route::apiResource("tickets", TicketController::class);
         Route::prefix("tickets")->group(function () {
             Route::controller(TicketController::class)->group(function () {
-                Route::get("/", "index");
-                Route::post("/", "store");
-                Route::get("{ticket}", "show");
-                Route::put("{ticket}", "update");
-                Route::delete("{ticket}", "destroy");
                 Route::patch("{ticket}/status", "changeStatus");
                 Route::patch("{ticket}/assign", "assign");
             });
@@ -288,10 +284,6 @@ Route::prefix("v1")->group(function () {
                 function () {
                     Route::get("{ticket}/comments", "index");
                     Route::post("{ticket}/comments", "store");
-                    Route::get(
-                        "{ticket}/attachments/{attachment}",
-                        "downloadAttachment",
-                    )->name("api.v1.tickets.attachments.download");
                 },
             );
         });

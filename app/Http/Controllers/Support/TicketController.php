@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Support;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ticket\AssignTicketRequest;
-use App\Http\Requests\Ticket\ChangeStatusRequest;
+use App\Http\Requests\Ticket\ChangeTicketStatusRequest;
 use App\Http\Requests\Ticket\CreateTicketRequest;
 use App\Http\Requests\Ticket\UpdateTicketRequest;
 use App\Http\Resources\TicketResource;
@@ -87,7 +87,7 @@ class TicketController extends Controller
     }
 
     public function changeStatus(
-        ChangeStatusRequest $request,
+        ChangeTicketStatusRequest $request,
         Ticket $ticket,
     ): JsonResponse {
         // Authorize based on status - if closing, check 'close' permission, otherwise 'update'

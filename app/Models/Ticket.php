@@ -105,11 +105,6 @@ class Ticket extends Model
         return $this->hasMany(TicketComment::class);
     }
 
-    public function attachments(): HasMany
-    {
-        return $this->hasMany(TicketAttachment::class);
-    }
-
     /**
      * Scopes
      */

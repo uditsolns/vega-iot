@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/AuditReport/AuditReportController.php
 
 namespace App\Http\Controllers\Report;
 
@@ -48,15 +47,6 @@ class AuditReportController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="' . $report->name . '.pdf"',
         ]);
-    }
-
-    public function show(AuditReport $auditReport): JsonResponse
-    {
-        $this->authorize('view', $auditReport);
-
-        $auditReport->load('generatedBy');
-
-        return $this->success($auditReport);
     }
 
     /**

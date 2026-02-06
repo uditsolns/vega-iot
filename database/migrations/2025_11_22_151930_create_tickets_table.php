@@ -18,33 +18,13 @@ return new class extends Migration {
             // Foreign keys
             $table->foreignId("user_id")->constrained()->onDelete("cascade");
             $table->foreignId("company_id")->constrained()->onDelete("cascade");
-            $table
-                ->foreignId("assigned_to")
-                ->nullable()
-                ->constrained("users")
-                ->onDelete("set null");
+            $table->foreignId("assigned_to")->nullable()->constrained("users")->onDelete("set null");
 
             // Optional related entities
-            $table
-                ->foreignId("device_id")
-                ->nullable()
-                ->constrained()
-                ->onDelete("set null");
-            $table
-                ->foreignId("location_id")
-                ->nullable()
-                ->constrained()
-                ->onDelete("set null");
-            $table
-                ->foreignId("hub_id")
-                ->nullable()
-                ->constrained()
-                ->onDelete("set null");
-            $table
-                ->foreignId("area_id")
-                ->nullable()
-                ->constrained()
-                ->onDelete("set null");
+            $table->foreignId("device_id")->nullable()->constrained()->onDelete("set null");
+            $table->foreignId("location_id")->nullable()->constrained()->onDelete("set null");
+            $table->foreignId("hub_id")->nullable()->constrained()->onDelete("set null");
+            $table->foreignId("area_id")->nullable()->constrained()->onDelete("set null");
 
             // Ticket details
             $table->string("subject");

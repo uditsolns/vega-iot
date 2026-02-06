@@ -18,13 +18,7 @@ class ScheduledReportNotification extends Notification implements ShouldQueue
      */
     public function __construct(
         public readonly int $scheduledReportId,
-        public readonly string $reportName,
-        public readonly string $frequency,
-        public readonly string $format,
-        public readonly string $dataFormation,
-        public readonly array $reportFilePaths, // Just the file paths, not the content
-        public readonly int $successCount = 0,
-        public readonly int $failureCount = 0
+        public readonly array $reportFilePaths,
     ) {
 //        $this->onQueue(config('notifications.queue', 'notifications'));
     }
@@ -40,12 +34,11 @@ class ScheduledReportNotification extends Notification implements ShouldQueue
         $scheduledReport = ScheduledReport::find($this->scheduledReportId);
 
         $message = (new MsgClubEmailMessage)
-            ->subject("Scheduled Report: {$this->reportName}")
+            ->subject("Scheduled Report: {$scheduledReport->name}")
             ->view('emails.reports.scheduled-report', [
                 'scheduledReport' => $scheduledReport,
-                'successCount' => $this->successCount,
-                'failureCount' => $this->failureCount,
                 'user' => $notifiable,
+                'reports' => $this->reportFilePaths,
             ]);
 
         // Attach all PDF reports

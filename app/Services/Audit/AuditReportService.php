@@ -91,11 +91,7 @@ readonly class AuditReportService
             // Create notification
             $notification = new AuditReportNotification(
                 auditReportId: $report->id,
-                reportName: $report->name,
-                reportType: $report->type->label(),
-                pdfPath: $tempPath,
-                generatedById: $report->generated_by,
-                generatedByName: "{$report->generatedBy->first_name} {$report->generatedBy->last_name}"
+                pdfPath: $tempPath
             );
 
             // Send notification
@@ -103,9 +99,9 @@ readonly class AuditReportService
         }
 
         // Cleanup temp file after sending
-        if (file_exists($tempPath)) {
-            @unlink($tempPath);
-        }
+        // if (file_exists($tempPath)) {
+        //     @unlink($tempPath);
+        // }
 
         return $pdfContent;
     }

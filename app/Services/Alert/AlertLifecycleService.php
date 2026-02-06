@@ -30,9 +30,6 @@ readonly class AlertLifecycleService
         DeviceReading $reading,
     ): void {
         try {
-            // Load device configuration
-            $device->load("currentConfiguration", "area");
-
             if (!$device->currentConfiguration) {
                 Log::warning(
                     "Device has no configuration, skipping alert evaluation",

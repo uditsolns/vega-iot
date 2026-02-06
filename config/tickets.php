@@ -1,10 +1,6 @@
 <?php
 
 return [
-    'max_attachments' => env('TICKET_MAX_ATTACHMENTS', 5),
-    'max_file_size' => env('TICKET_MAX_FILE_SIZE', 10240), // KB
-    'allowed_mime_types' => explode(',', env('TICKET_ALLOWED_MIME_TYPES', 'jpg,jpeg,png,pdf,doc,docx,txt')),
-
     'status_colors' => [
         'open' => '#17A2B8',
         'in_progress' => '#FFC107',

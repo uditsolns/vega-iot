@@ -35,32 +35,12 @@ class TicketCommentController extends Controller
     {
         $this->authorize('addComment', $ticket);
 
-        $attachments = $request->hasFile('attachments') ? $request->file('attachments') : null;
-
         $comment = $this->ticketCommentService->addComment(
             $ticket,
             $request->validated(),
             $request->user(),
-            $attachments
         );
 
         return $this->created(new TicketCommentResource($comment), 'Comment added successfully');
-    }
-
-    public function downloadAttachment(Ticket $ticket, TicketAttachment $attachment): BinaryFileResponse|JsonResponse
-    {
-        $this->authorize('view', $ticket);
-
-        if ($attachment->ticket_id !== $ticket->id) {
-            return $this->error('Attachment does not belong to this ticket', 404);
-        }
-
-        $filePath = $this->ticketCommentService->getAttachmentPath($attachment);
-
-        if (!$filePath) {
-            return $this->error('File not found', 404);
-        }
-
-        return response()->download($filePath, $attachment->file_name);
     }
 }
