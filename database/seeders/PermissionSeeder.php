@@ -166,12 +166,6 @@ class PermissionSeeder extends Seeder
                 "action" => "view",
                 "description" => "View readings",
             ],
-            [
-                "name" => "readings.export",
-                "resource" => "readings",
-                "action" => "export",
-                "description" => "Export readings",
-            ],
 
             // Alerts
             [
@@ -263,12 +257,11 @@ class PermissionSeeder extends Seeder
                 "description" => "View reports",
             ],
             [
-                "name" => "reports.export",
+                "name" => "reports.create",
                 "resource" => "reports",
-                "action" => "export",
-                "description" => "Export reports",
+                "action" => "create",
+                "description" => "Create reports",
             ],
-
             // Scheduled Reports
             [
                 "name" => "scheduled_reports.view",
@@ -297,16 +290,16 @@ class PermissionSeeder extends Seeder
 
             // Audit
             [
-                "name" => "audit.view",
+                "name" => "audit_reports.view",
                 "resource" => "audit",
                 "action" => "view",
                 "description" => "View audit logs",
             ],
             [
-                "name" => "audit.generate-report",
-                "resource" => "audit",
-                "action" => "generate-report",
-                "description" => "Generate audit reports",
+                "name" => "audit_reports.create",
+                "resource" => "audit_reports",
+                "action" => "create",
+                "description" => "Create audit reports",
             ],
 
             // Assets (Calibration Instruments)

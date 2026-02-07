@@ -12,26 +12,24 @@ class ReportPolicy
 
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasPermission('reports.view');
     }
 
     public function view(User $user, Report $report): bool
     {
-        return true;
+        if (!$user->hasPermission('reports.view')) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $report->company_id === $user->company_id;
     }
 
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPermission('reports.create');
     }
-
-//    public function update(User $user, Report $report): bool
-//    {
-//        return true;
-//    }
-
-//    public function delete(User $user, Report $report): bool
-//    {
-//        return true;
-//    }
 }

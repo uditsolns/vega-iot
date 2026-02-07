@@ -13,15 +13,9 @@ class LocationSeeder extends Seeder
     public function run(): void
     {
         // Get companies
-        $acme = DB::table("companies")
-            ->where("name", "Acme Corporation")
-            ->first();
-        $techvista = DB::table("companies")
-            ->where("name", "TechVista Solutions")
-            ->first();
-        $globalFoods = DB::table("companies")
-            ->where("name", "Global Foods Inc")
-            ->first();
+        $acme = DB::table("companies")->where("name", "Acme Corporation")->first();
+        $techvista = DB::table("companies")->where("name", "TechVista Solutions")->first();
+        $globalFoods = DB::table("companies")->where("name", "Global Foods Inc")->first();
 
         // Locations
         $locations = [
@@ -92,20 +86,16 @@ class LocationSeeder extends Seeder
 
         foreach ($locations as $location) {
             $locationId = DB::table("locations")->insertGetId($location);
-
-            // Create hubs for each location
-            $this->createHubsForLocation($locationId, $location["name"]);
+            $this->createHubsForLocation($locationId);
         }
     }
 
-    private function createHubsForLocation(
-        int $locationId,
-        string $locationName,
-    ): void {
+    private function createHubsForLocation(int $locationId): void
+    {
         $hubs = [
             [
                 "location_id" => $locationId,
-                "name" => $locationName . " - Building A",
+                "name" => "Building A",
                 "description" => "Main building",
                 "is_active" => true,
                 "created_at" => now(),
@@ -113,7 +103,7 @@ class LocationSeeder extends Seeder
             ],
             [
                 "location_id" => $locationId,
-                "name" => $locationName . " - Building B",
+                "name" => "Building B",
                 "description" => "Secondary building",
                 "is_active" => true,
                 "created_at" => now(),
@@ -123,18 +113,16 @@ class LocationSeeder extends Seeder
 
         foreach ($hubs as $hub) {
             $hubId = DB::table("hubs")->insertGetId($hub);
-
-            // Create areas for each hub
-            $this->createAreasForHub($hubId, $hub["name"]);
+            $this->createAreasForHub($hubId);
         }
     }
 
-    private function createAreasForHub(int $hubId, string $hubName): void
+    private function createAreasForHub(int $hubId): void
     {
         $areas = [
             [
                 "hub_id" => $hubId,
-                "name" => $hubName . " - Cold Storage",
+                "name" => "Cold Storage",
                 "description" => "Temperature controlled storage area",
                 "is_active" => true,
                 // Alert channel configuration
@@ -154,7 +142,7 @@ class LocationSeeder extends Seeder
             ],
             [
                 "hub_id" => $hubId,
-                "name" => $hubName . " - Server Room",
+                "name" => "Server Room",
                 "description" => "IT infrastructure area",
                 "is_active" => true,
                 // Alert channel configuration
@@ -174,7 +162,7 @@ class LocationSeeder extends Seeder
             ],
             [
                 "hub_id" => $hubId,
-                "name" => $hubName . " - Warehouse Floor",
+                "name" => "Warehouse Floor",
                 "description" => "General storage and operations",
                 "is_active" => true,
                 // Alert channel configuration

@@ -72,7 +72,7 @@ class DashboardController extends Controller
      */
     public function recentActivity(Request $request): JsonResponse
     {
-        if (!$request->user()->hasPermission('audit.view')) {
+        if (!$request->user()->hasPermission('audit_reports.view')) {
             return $this->error('Unauthorized', 403);
         }
 

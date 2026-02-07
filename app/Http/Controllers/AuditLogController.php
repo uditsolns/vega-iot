@@ -21,7 +21,7 @@ class AuditLogController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        if (!$request->user()->hasPermission('audit.view')) {
+        if (!$request->user()->hasPermission('audit_reports.view')) {
             throw new UnauthorizedException("Unauthorized", 403);
         }
 

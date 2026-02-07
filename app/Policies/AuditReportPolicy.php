@@ -9,12 +9,12 @@ class AuditReportPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasPermission('audit.view');
+        return $user->hasPermission('audit_reports.view');
     }
 
     public function view(User $user, AuditReport $report): bool
     {
-        if (!$user->hasPermission('audit.view')) {
+        if (!$user->hasPermission('audit_reports.view')) {
             return false;
         }
 
@@ -27,6 +27,6 @@ class AuditReportPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasPermission('audit.generate-report');
+        return $user->hasPermission('audit_reports.create');
     }
 }

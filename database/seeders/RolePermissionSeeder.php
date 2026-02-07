@@ -7,24 +7,13 @@ use Illuminate\Support\Facades\DB;
 
 class RolePermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Get all roles
         $superAdmin = DB::table("roles")->where("name", "Super Admin")->first();
-        $companyAdmin = DB::table("roles")
-            ->where("name", "Company Admin")
-            ->first();
-        $manager = DB::table("roles")->where("name", "Manager")->first();
-        $technician = DB::table("roles")->where("name", "Technician")->first();
-        $operator = DB::table("roles")->where("name", "Operator")->first();
-        $viewer = DB::table("roles")->where("name", "Viewer")->first();
+        $companyAdmin = DB::table("roles")->where("name", "Company Admin")->first();
+        $companyUser = DB::table("roles")->where("name", "Manager")->first();
 
-        // Get all permissions
         $allPermissions = DB::table("permissions")->pluck("id", "name");
-
         $rolePermissions = [];
 
         // Super Admin - ALL permissions
@@ -35,9 +24,23 @@ class RolePermissionSeeder extends Seeder
             ];
         }
 
-        // Company Admin - All except companies.create, companies.delete
+        // Company Admin - All except system-level operations
+        $companyAdminExclude = [
+            "companies.create",
+            "companies.delete",
+            "devices.create", // Only super admin can create devices
+            "devices.delete", // Only super admin can delete devices
+            "devices.assign_to_company",
+            "devices.bulk_assign_to_company",
+            "tickets.assign",
+            "tickets.resolve",
+            "tickets.close",
+            "tickets.add_internal_comments",
+            "tickets.view_internal_comments"
+        ];
+
         foreach ($allPermissions as $name => $permissionId) {
-            if (!in_array($name, [ "companies.create", "companies.delete"])) {
+            if (!in_array($name, $companyAdminExclude)) {
                 $rolePermissions[] = [
                     "role_id" => $companyAdmin->id,
                     "permission_id" => $permissionId,
@@ -45,23 +48,14 @@ class RolePermissionSeeder extends Seeder
             }
         }
 
-        // Manager - users (view, create, update), locations, devices, readings, alerts, tickets, reports
-        $managerPermissions = [
-            "users.view",
-            "users.create",
-            "users.update",
-            "users.assign_roles",
-            "users.assign_areas",
+        // Company User - Operational permissions only
+        $companyUserPermissions = [
             "locations.view",
-            "locations.create",
-            "locations.update",
-            "locations.delete",
+            "users.view",
             "devices.view",
-            "devices.create",
-            "devices.update",
-            "devices.delete",
             "devices.configure",
-            "devices.assign",
+            "devices.assign_to_area",
+            "devices.bulk_assign_to_area",
             "readings.view",
             "readings.export",
             "alerts.view",
@@ -70,69 +64,20 @@ class RolePermissionSeeder extends Seeder
             "tickets.view",
             "tickets.create",
             "tickets.update",
-            "tickets.assign",
-            "tickets.close",
             "reports.view",
-            "reports.export",
+            "reports.generate",
+            "scheduled_reports.view",
+            "audit_reports.view",
+            "assets.view",
+            "validation_studies.view",
             "roles.view",
         ];
-        foreach ($managerPermissions as $permission) {
+
+        foreach ($companyUserPermissions as $permission) {
             if (isset($allPermissions[$permission])) {
                 $rolePermissions[] = [
-                    "role_id" => $manager->id,
+                    "role_id" => $companyUser->id,
                     "permission_id" => $allPermissions[$permission],
-                ];
-            }
-        }
-
-        // Technician - devices (all), readings, alerts (view, acknowledge)
-        $technicianPermissions = [
-            "devices.view",
-            "devices.create",
-            "devices.update",
-            "devices.delete",
-            "devices.configure",
-            "devices.assign",
-            "readings.view",
-            "alerts.view",
-            "alerts.acknowledge",
-            "locations.view",
-        ];
-        foreach ($technicianPermissions as $permission) {
-            if (isset($allPermissions[$permission])) {
-                $rolePermissions[] = [
-                    "role_id" => $technician->id,
-                    "permission_id" => $allPermissions[$permission],
-                ];
-            }
-        }
-
-        // Operator - readings, alerts (view, acknowledge, resolve), tickets (view, create)
-        $operatorPermissions = [
-            "readings.view",
-            "alerts.view",
-            "alerts.acknowledge",
-            "alerts.resolve",
-            "tickets.view",
-            "tickets.create",
-            "devices.view",
-            "locations.view",
-        ];
-        foreach ($operatorPermissions as $permission) {
-            if (isset($allPermissions[$permission])) {
-                $rolePermissions[] = [
-                    "role_id" => $operator->id,
-                    "permission_id" => $allPermissions[$permission],
-                ];
-            }
-        }
-
-        // Viewer - *.view permissions only
-        foreach ($allPermissions as $name => $permissionId) {
-            if (str_ends_with($name, ".view")) {
-                $rolePermissions[] = [
-                    "role_id" => $viewer->id,
-                    "permission_id" => $permissionId,
                 ];
             }
         }

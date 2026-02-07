@@ -19,14 +19,16 @@ class PrepareUserContext
             return $next($request);
         }
 
+        // Always load role and permissions first
+        $user->load(['role.permissions', 'permissions']);
+
         if ($user->company_id) {
-            // Company user - load company, role, permissions, and area access
-            $user->load(['company', 'role.permissions', 'permissions', 'areaAccess']);
+            // Company user - load company and area access
+            $user->load(['company', 'areaAccess']);
             $user->allowedAreas = $user->areaAccess->pluck('area_id')->toArray();
             $user->hasAreaRestrictions = !empty($user->allowedAreas);
         } else {
-            // Super admin - no company or area restrictions
-            $user->load(['role.permissions', 'permissions']);
+            // System user (Super Admin, etc.) - no company or area restrictions
             $user->allowedAreas = [];
             $user->hasAreaRestrictions = false;
         }
