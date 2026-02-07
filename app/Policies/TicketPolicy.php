@@ -63,7 +63,7 @@ class TicketPolicy
         }
 
         // Ticket creator can delete their own ticket if it's still open
-        if ($ticket->user_id === $user->id && $ticket->is_open) {
+        if ($ticket->isCreatedBy($user) && $ticket->is_open) {
             return true;
         }
 
@@ -83,6 +83,23 @@ class TicketPolicy
     }
 
     /**
+     * Determine if the user can resolve a ticket.
+     */
+    public function resolve(User $user, Ticket $ticket): bool
+    {
+        if (!$user->hasPermission('tickets.resolve')) {
+            return false;
+        }
+
+        // Must be assigned to the ticket or be a super admin/manager
+        if (!$user->isSuperAdmin() && !$ticket->isAssignedTo($user)) {
+            return false;
+        }
+
+        return $this->userCanAccessTicket($user, $ticket);
+    }
+
+    /**
      * Determine if the user can close a ticket.
      */
     public function close(User $user, Ticket $ticket): bool
@@ -91,6 +108,24 @@ class TicketPolicy
             return false;
         }
 
+        return $this->userCanAccessTicket($user, $ticket);
+    }
+
+    /**
+     * Determine if the user can reopen a ticket.
+     */
+    public function reopen(User $user, Ticket $ticket): bool
+    {
+        if (!$user->hasPermission('tickets.reopen')) {
+            return false;
+        }
+
+        // Ticket creator can reopen their tickets
+        if ($ticket->isCreatedBy($user)) {
+            return true;
+        }
+
+        // Staff with permission can reopen
         return $this->userCanAccessTicket($user, $ticket);
     }
 
@@ -104,18 +139,37 @@ class TicketPolicy
     }
 
     /**
+     * Determine if the user can add internal comments.
+     * Only system's internal support staff can add internal comments.
+     */
+    public function addInternalComment(User $user, Ticket $ticket): bool
+    {
+        // Customer users cannot add internal comments
+        if ($user->company_id !== null) {
+            return false;
+        }
+
+        // system's internal support team with permission can add internal comments
+        if (!$user->hasPermission('tickets.add_internal_comments')) {
+            return false;
+        }
+
+        return $this->isInternalSupportUser($user) || $user->isSuperAdmin();
+    }
+
+    /**
      * Determine if the user can view internal comments.
-     * Only super admins or assigned users can view internal comments.
+     * Only system's internal support team can view internal comments.
      */
     public function viewInternalComments(User $user, Ticket $ticket): bool
     {
-        // Super admins can view internal comments
-        if ($user->isSuperAdmin()) {
-            return true;
+        // Customer users (those with company_id) can NEVER see internal comments
+        if ($user->company_id !== null) {
+            return false;
         }
 
-        // Assigned user can view internal comments
-        if ($ticket->assigned_to === $user->id) {
+        // system's internal support team can see internal comments
+        if ($user->isSuperAdmin() || $this->isInternalSupportUser($user)) {
             return true;
         }
 
@@ -127,41 +181,58 @@ class TicketPolicy
      */
     private function userCanAccessTicket(User $user, Ticket $ticket): bool
     {
-        // Super admins can access all tickets
-        if ($user->isSuperAdmin()) {
+        // System's internal support team (super admins and support staff) can access all tickets
+        if ($user->isSuperAdmin() || $this->isInternalSupportUser($user)) {
             return true;
         }
 
-        // Ticket creator can access their own tickets
-        if ($ticket->user_id === $user->id) {
+        // Ticket creator (customer user) can access their own tickets
+        if ($ticket->isCreatedBy($user)) {
             return true;
         }
 
-        // Assigned user can access assigned tickets
-        if ($ticket->assigned_to === $user->id) {
+        // Assigned system support user can access assigned tickets
+        if ($ticket->isAssignedTo($user)) {
             return true;
         }
 
-        // Ticket must be in user's company
-        if ($ticket->company_id !== $user->company_id) {
+        // Customer users in the same company can view each other's tickets
+        // (e.g., company admin can see tickets raised by their employees)
+        if ($user->company_id && $ticket->company_id === $user->company_id) {
+            // If user has area restrictions, check ticket's area
+            if ($user->hasAreaRestrictions ?? false) {
+                // If ticket has an area_id, user must have access to it
+                if ($ticket->area_id) {
+                    return in_array($ticket->area_id, $user->allowedAreas ?? []);
+                }
+
+                // If ticket doesn't have area but has location/hub, deny access for area-restricted users
+                if ($ticket->location_id || $ticket->hub_id) {
+                    return false;
+                }
+            }
+
+            // Users in same company without area restrictions can view
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if user is system's internal support staff
+     */
+    private function isInternalSupportUser(User $user): bool
+    {
+        // system's internal users have company_id = null
+        if ($user->company_id !== null) {
             return false;
         }
 
-        // If user has area restrictions, check ticket's area
-        if ($user->hasAreaRestrictions) {
-            // If ticket has an area_id, user must have access to it
-            if ($ticket->area_id) {
-                return in_array($ticket->area_id, $user->allowedAreas);
-            }
-
-            // If ticket doesn't have area but has location/hub, deny access for area-restricted users
-            // Area-restricted users should only see tickets explicitly in their areas
-            if ($ticket->location_id || $ticket->hub_id) {
-                return false;
-            }
-        }
-
-        // Users in same company without area restrictions can view
+        // Must have tickets-related permissions
+//        return $user->hasPermission('tickets.view') ||
+//            $user->hasPermission('tickets.assign') ||
+//            $user->hasPermission('tickets.resolve');
         return true;
     }
 }

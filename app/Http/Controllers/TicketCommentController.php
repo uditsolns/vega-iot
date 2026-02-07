@@ -1,16 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Support;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Ticket\CreateCommentRequest;
 use App\Http\Resources\TicketCommentResource;
 use App\Models\Ticket;
-use App\Models\TicketAttachment;
 use App\Services\Support\TicketCommentService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TicketCommentController extends Controller
 {
@@ -24,16 +21,26 @@ class TicketCommentController extends Controller
     {
         $this->authorize('view', $ticket);
 
-        $includeInternal = request()->user()->can('viewInternalComments', $ticket);
+        $canSeeInternal = $ticket->canUserSeeInternalComments(request()->user());
 
-        $comments = $this->ticketCommentService->getComments($ticket, request()->user(), $includeInternal);
+        $comments = $this->ticketCommentService->getComments(
+            $ticket,
+            request()->user(),
+            $canSeeInternal
+        );
 
         return $this->success(TicketCommentResource::collection($comments));
     }
 
     public function store(CreateCommentRequest $request, Ticket $ticket): JsonResponse
     {
+        // Check if user can add comment
         $this->authorize('addComment', $ticket);
+
+        // If trying to add internal comment, check specific permission
+        if ($request->boolean('is_internal')) {
+            $this->authorize('addInternalComment', $ticket);
+        }
 
         $comment = $this->ticketCommentService->addComment(
             $ticket,
@@ -41,6 +48,9 @@ class TicketCommentController extends Controller
             $request->user(),
         );
 
-        return $this->created(new TicketCommentResource($comment), 'Comment added successfully');
+        return $this->created(
+            new TicketCommentResource($comment),
+            'Comment added successfully'
+        );
     }
 }

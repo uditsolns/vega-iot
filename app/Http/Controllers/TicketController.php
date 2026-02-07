@@ -1,11 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Support;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Ticket\AssignTicketRequest;
-use App\Http\Requests\Ticket\ChangeTicketStatusRequest;
 use App\Http\Requests\Ticket\CreateTicketRequest;
+use App\Http\Requests\Ticket\ResolveTicketRequest;
 use App\Http\Requests\Ticket\UpdateTicketRequest;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
@@ -54,10 +53,18 @@ class TicketController extends Controller
         $ticket->load([
             "user",
             "assignedTo",
+            "resolvedBy",
+            "closedBy",
             "device",
             "location",
             "area",
-            "comments.user",
+            "comments" => function ($query) use ($ticket) {
+                $canSeeInternal = $ticket->canUserSeeInternalComments(auth()->user());
+                if (!$canSeeInternal) {
+                    $query->where('is_internal', false);
+                }
+                $query->with('user');
+            },
         ]);
 
         return $this->success(new TicketResource($ticket));
@@ -86,28 +93,6 @@ class TicketController extends Controller
         return $this->success(null, "Ticket deleted successfully");
     }
 
-    public function changeStatus(
-        ChangeTicketStatusRequest $request,
-        Ticket $ticket,
-    ): JsonResponse {
-        // Authorize based on status - if closing, check 'close' permission, otherwise 'update'
-        if ($request->validated()["status"] === "closed") {
-            $this->authorize("close", $ticket);
-        } else {
-            $this->authorize("update", $ticket);
-        }
-
-        $ticket = $this->ticketService->changeStatus(
-            $ticket,
-            $request->validated()["status"],
-        );
-
-        return $this->success(
-            new TicketResource($ticket),
-            "Ticket status updated successfully",
-        );
-    }
-
     public function assign(
         AssignTicketRequest $request,
         Ticket $ticket,
@@ -123,6 +108,58 @@ class TicketController extends Controller
         return $this->success(
             new TicketResource($ticket),
             "Ticket assigned successfully",
+        );
+    }
+
+    public function resolve(
+        ResolveTicketRequest $request,
+        Ticket $ticket,
+    ): JsonResponse {
+        $this->authorize("resolve", $ticket);
+
+        $ticket = $this->ticketService->resolve(
+            $ticket,
+            $request->user(),
+            $request->validated()['resolution_comment'] ?? null,
+        );
+
+        return $this->success(
+            new TicketResource($ticket),
+            "Ticket resolved successfully",
+        );
+    }
+
+    public function close(
+        Request $request,
+        Ticket $ticket,
+    ): JsonResponse {
+        $this->authorize("close", $ticket);
+
+        $ticket = $this->ticketService->close(
+            $ticket,
+            $request->user(),
+        );
+
+        return $this->success(
+            new TicketResource($ticket),
+            "Ticket closed successfully",
+        );
+    }
+
+    public function reopen(
+        Request $request,
+        Ticket $ticket,
+    ): JsonResponse {
+        $this->authorize("reopen", $ticket);
+
+        $ticket = $this->ticketService->reopen(
+            $ticket,
+            $request->user(),
+        );
+
+        return $this->success(
+            new TicketResource($ticket),
+            "Ticket reopened successfully",
         );
     }
 }

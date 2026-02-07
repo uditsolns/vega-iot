@@ -41,6 +41,28 @@ enum TicketStatus: string
     }
 
     /**
+     * Get valid next statuses from current status
+     */
+    public function allowedTransitions(): array
+    {
+        return match ($this) {
+            self::Open => [self::InProgress, self::Resolved, self::Closed],
+            self::InProgress => [self::Resolved, self::Closed, self::Open],
+            self::Resolved => [self::Closed, self::Reopened],
+            self::Closed => [self::Reopened],
+            self::Reopened => [self::InProgress, self::Resolved, self::Closed],
+        };
+    }
+
+    /**
+     * Check if transition to another status is allowed
+     */
+    public function canTransitionTo(TicketStatus $newStatus): bool
+    {
+        return in_array($newStatus, $this->allowedTransitions());
+    }
+
+    /**
      * Get all values as array
      */
     public static function values(): array

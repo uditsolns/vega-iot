@@ -213,16 +213,46 @@ class PermissionSeeder extends Seeder
                 "description" => "Update tickets",
             ],
             [
+                "name" => "tickets.delete",
+                "resource" => "tickets",
+                "action" => "delete",
+                "description" => "Delete tickets",
+            ],
+            [
                 "name" => "tickets.assign",
                 "resource" => "tickets",
                 "action" => "assign",
-                "description" => "Assign tickets",
+                "description" => "Assign tickets to users",
+            ],
+            [
+                "name" => "tickets.resolve",
+                "resource" => "tickets",
+                "action" => "resolve",
+                "description" => "Resolve tickets",
             ],
             [
                 "name" => "tickets.close",
                 "resource" => "tickets",
                 "action" => "close",
                 "description" => "Close tickets",
+            ],
+            [
+                "name" => "tickets.reopen",
+                "resource" => "tickets",
+                "action" => "reopen",
+                "description" => "Reopen closed tickets",
+            ],
+            [
+                "name" => "tickets.add_internal_comments",
+                "resource" => "tickets",
+                "action" => "add_internal_comments",
+                "description" => "Add internal comments (not visible to customers)",
+            ],
+            [
+                "name" => "tickets.view_internal_comments",
+                "resource" => "tickets",
+                "action" => "view_internal_comments",
+                "description" => "View internal comments",
             ],
 
             // Reports
@@ -239,12 +269,96 @@ class PermissionSeeder extends Seeder
                 "description" => "Export reports",
             ],
 
+            // Scheduled Reports
+            [
+                "name" => "scheduled_reports.view",
+                "resource" => "scheduled_reports",
+                "action" => "view",
+                "description" => "View scheduled reports",
+            ],
+            [
+                "name" => "scheduled_reports.create",
+                "resource" => "scheduled_reports",
+                "action" => "create",
+                "description" => "Create scheduled reports",
+            ],
+            [
+                "name" => "scheduled_reports.update",
+                "resource" => "scheduled_reports",
+                "action" => "update",
+                "description" => "Update scheduled reports",
+            ],
+            [
+                "name" => "scheduled_reports.delete",
+                "resource" => "scheduled_reports",
+                "action" => "delete",
+                "description" => "Delete scheduled reports",
+            ],
+
             // Audit
             [
                 "name" => "audit.view",
                 "resource" => "audit",
                 "action" => "view",
                 "description" => "View audit logs",
+            ],
+            [
+                "name" => "audit.generate-report",
+                "resource" => "audit",
+                "action" => "generate-report",
+                "description" => "Generate audit reports",
+            ],
+
+            // Assets (Calibration Instruments)
+            [
+                "name" => "assets.view",
+                "resource" => "assets",
+                "action" => "view",
+                "description" => "View calibration instruments",
+            ],
+            [
+                "name" => "assets.create",
+                "resource" => "assets",
+                "action" => "create",
+                "description" => "Create calibration instruments",
+            ],
+            [
+                "name" => "assets.update",
+                "resource" => "assets",
+                "action" => "update",
+                "description" => "Update calibration instruments",
+            ],
+            [
+                "name" => "assets.delete",
+                "resource" => "assets",
+                "action" => "delete",
+                "description" => "Delete calibration instruments",
+            ],
+
+            // Validation Studies
+            [
+                "name" => "validation_studies.view",
+                "resource" => "validation_studies",
+                "action" => "view",
+                "description" => "View validation studies",
+            ],
+            [
+                "name" => "validation_studies.create",
+                "resource" => "validation_studies",
+                "action" => "create",
+                "description" => "Create validation studies",
+            ],
+            [
+                "name" => "validation_studies.update",
+                "resource" => "validation_studies",
+                "action" => "update",
+                "description" => "Update validation studies",
+            ],
+            [
+                "name" => "validation_studies.delete",
+                "resource" => "validation_studies",
+                "action" => "delete",
+                "description" => "Delete validation studies",
             ],
 
             // Roles

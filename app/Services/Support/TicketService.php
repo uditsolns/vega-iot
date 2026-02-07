@@ -5,6 +5,10 @@ namespace App\Services\Support;
 use App\Models\Device;
 use App\Models\Ticket;
 use App\Models\User;
+use App\Notifications\TicketAssignedNotification;
+use App\Notifications\TicketCreatedNotification;
+use App\Notifications\TicketReopenedNotification;
+use App\Notifications\TicketResolvedNotification;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +37,8 @@ readonly class TicketService
             ->allowedIncludes([
                 "user",
                 "assignedTo",
+                "resolvedBy",
+                "closedBy",
                 "device",
                 "location",
                 "area",
@@ -63,6 +69,16 @@ readonly class TicketService
 
         $ticket = Ticket::create($data);
 
+        // Audit log
+        activity("ticket")
+            ->event('created')
+            ->performedOn($ticket)
+            ->withProperties(['ticket_id' => $ticket->id])
+            ->log("Created ticket \"$ticket->subject\"");
+
+        // Send notification to support team (users with tickets.view permission in the company)
+        $this->notifySupportTeam($ticket, 'created');
+
         return $ticket->fresh();
     }
 
@@ -73,38 +89,34 @@ readonly class TicketService
     {
         $ticket->update($data);
 
-        return $ticket->fresh();
-    }
-
-    /**
-     * Change ticket status.
-     */
-    public function changeStatus(Ticket $ticket, string $status): Ticket
-    {
-        $oldStatus = $ticket->status;
-
-        $ticket->changeStatus($status);
-
         // Audit log
         activity("ticket")
-            ->event('changed_status')
+            ->event('updated')
             ->performedOn($ticket)
             ->withProperties(['ticket_id' => $ticket->id])
-            ->log("Changed status from \"$oldStatus->value\" to \"$ticket->status->value\" for ticket \"$ticket->subject\"");
+            ->log("Updated ticket \"$ticket->subject\"");
 
         return $ticket->fresh();
     }
 
     /**
-     * Assign ticket to a user.
+     * Assign ticket to a system support user.
      */
     public function assign(
         Ticket $ticket,
         int $assignedToUserId,
         User $assignedBy,
     ): Ticket {
-        $assignedToUser = User::find($assignedToUserId);
-        $ticket->assign(User::findOrFail($assignedToUserId));
+        $assignedToUser = User::findOrFail($assignedToUserId);
+
+        // Validate that assigned user is VEGA's internal support (not a customer user)
+        if ($assignedToUser->company_id !== null) {
+            throw new \InvalidArgumentException(
+                'Only system internal support users can be assigned to tickets. Customer users cannot be assigned.'
+            );
+        }
+
+        $ticket->assign($assignedToUser);
 
         // Audit log
         activity("ticket")
@@ -112,33 +124,135 @@ readonly class TicketService
             ->performedOn($ticket)
             ->withProperties([
                 'ticket_id' => $ticket->id,
-                'assigned_user_id' => $assignedToUser->id,
+                'assigned_to_user_id' => $assignedToUser->id,
+                'assigned_by_user_id' => $assignedBy->id,
             ])
-            ->log("Assigned ticket \"{$ticket->subject}\" to user \"{$assignedToUser->email}\"");
+            ->log("Assigned ticket \"{$ticket->subject}\" to system support user \"{$assignedToUser->email}\"");
 
-        // TODO: Send notification to assigned user
-        // event(new TicketAssigned($ticket));
+        // Send notification to assigned VEGA support user
+        $assignedToUser->notify(
+            new TicketAssignedNotification(
+                ticketId: $ticket->id,
+                subject: $ticket->subject,
+                assignedBy: $assignedBy->id,
+            )
+        );
+
+        return $ticket->fresh();
+    }
+
+    /**
+     * Resolve a ticket.
+     */
+    public function resolve(Ticket $ticket, User $resolvedBy, ?string $comment = null): Ticket
+    {
+        $ticket->resolve($resolvedBy);
+
+        // Add resolution comment if provided
+        if ($comment) {
+            $ticket->comments()->create([
+                'user_id' => $resolvedBy->id,
+                'comment' => $comment,
+                'is_internal' => false, // Resolution comments are visible to customer
+            ]);
+        }
+
+        // Audit log
+        activity("ticket")
+            ->event('resolved')
+            ->performedOn($ticket)
+            ->withProperties([
+                'ticket_id' => $ticket->id,
+                'resolved_by_user_id' => $resolvedBy->id,
+            ])
+            ->log("Resolved ticket \"{$ticket->subject}\"");
+
+        // Send notification to ticket creator
+        $ticket->user->notify(
+            new TicketResolvedNotification(
+                ticketId: $ticket->id,
+                subject: $ticket->subject,
+                resolvedBy: $resolvedBy->id,
+            )
+        );
+
+        return $ticket->fresh();
+    }
+
+    /**
+     * Close a ticket.
+     */
+    public function close(Ticket $ticket, User $closedBy): Ticket
+    {
+        $ticket->close($closedBy);
+
+        // Audit log
+        activity("ticket")
+            ->event('closed')
+            ->performedOn($ticket)
+            ->withProperties([
+                'ticket_id' => $ticket->id,
+                'closed_by_user_id' => $closedBy->id,
+            ])
+            ->log("Closed ticket \"{$ticket->subject}\"");
+
+        // Note: Closing doesn't send notification to customer
+        // They were already notified when it was resolved
+
+        return $ticket->fresh();
+    }
+
+    /**
+     * Reopen a ticket.
+     */
+    public function reopen(Ticket $ticket, User $reopenedBy): Ticket
+    {
+        $ticket->reopen();
+
+        // Audit log
+        activity("ticket")
+            ->event("reopened")
+            ->performedOn($ticket)
+            ->withProperties([
+                'ticket_id' => $ticket->id,
+                'reopened_by_user_id' => $reopenedBy->id,
+            ])
+            ->log("Reopened ticket \"{$ticket->subject}\"");
+
+        // If customer reopened, notify support team
+        if ($ticket->isCreatedBy($reopenedBy)) {
+            $this->notifySupportTeam($ticket, 'reopened');
+        } else {
+            // If support reopened, notify customer
+            $ticket->user->notify(
+                new TicketReopenedNotification(
+                    ticketId: $ticket->id,
+                    subject: $ticket->subject,
+                    reopenedBy: $reopenedBy->id,
+                )
+            );
+        }
 
         return $ticket->fresh();
     }
 
     /**
      * Delete a ticket (soft delete).
-     *
-     * @param Ticket $ticket
-     * @return bool
      */
     public function delete(Ticket $ticket): bool
     {
+        // Audit log
+        activity("ticket")
+            ->event('deleted')
+            ->performedOn($ticket)
+            ->withProperties(['ticket_id' => $ticket->id])
+            ->log("Deleted ticket \"{$ticket->subject}\"");
 
         return $ticket->delete();
     }
 
     /**
      * Get ticket statistics for a user.
-     *
-     * @param User $user
-     * @return array
      */
     public function getStatistics(User $user): array
     {
@@ -152,8 +266,8 @@ readonly class TicketService
             ->where("status", "in_progress")
             ->count();
 
-        // Total waiting (assuming 'waiting' is a valid status or use 'reopened')
-        $totalWaiting = (clone $query)->where("status", "reopened")->count();
+        // Total reopened
+        $totalReopened = (clone $query)->where("status", "reopened")->count();
 
         // Total resolved this week
         $totalResolvedThisWeek = (clone $query)
@@ -191,7 +305,7 @@ readonly class TicketService
         return [
             "total_open" => $totalOpen,
             "total_in_progress" => $totalInProgress,
-            "total_waiting" => $totalWaiting,
+            "total_reopened" => $totalReopened,
             "total_resolved_this_week" => $totalResolvedThisWeek,
             "avg_resolution_time_hours" => $avgResolutionTimeHours,
             "my_assigned_count" => $myAssignedCount,
@@ -202,5 +316,38 @@ readonly class TicketService
                 "urgent" => $byPriority["urgent"] ?? 0,
             ],
         ];
+    }
+
+    /**
+     * Notify system's internal support team about ticket event
+     */
+    private function notifySupportTeam(Ticket $ticket, string $event): void
+    {
+        // Get system's internal support users (users without company_id = VEGA staff)
+        $supportUsers = User::whereNull('company_id')
+        ->where('is_active', true)
+            ->get();
+
+        // Send appropriate notification based on event
+        foreach ($supportUsers as $user) {
+            if ($event === 'created') {
+                $user->notify(
+                    new TicketCreatedNotification(
+                        ticketId: $ticket->id,
+                        subject: $ticket->subject,
+                        priority: $ticket->priority->value,
+                        createdBy: $ticket->user_id,
+                    )
+                );
+            } elseif ($event === 'reopened') {
+                $user->notify(
+                    new TicketReopenedNotification(
+                        ticketId: $ticket->id,
+                        subject: $ticket->subject,
+                        reopenedBy: $ticket->user_id,
+                    )
+                );
+            }
+        }
     }
 }

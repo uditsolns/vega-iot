@@ -38,6 +38,12 @@ class TicketResource extends JsonResource
             "assigned_to_user" => new UserResource(
                 $this->whenLoaded("assignedTo"),
             ),
+            "resolved_by" => $this->resolved_by,
+            "resolved_by_user" => new UserResource($this->whenLoaded("resolvedBy")),
+
+            "closed_by" => $this->closed_by,
+            "closed_by_user" => new UserResource($this->whenLoaded("closedBy")),
+
             "device" => new DeviceResource($this->whenLoaded("device")),
             "location" => new LocationResource($this->whenLoaded("location")),
             "area" => new AreaResource($this->whenLoaded("area")),

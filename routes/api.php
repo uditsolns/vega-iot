@@ -23,8 +23,8 @@ use App\Http\Controllers\Report\AuditReportController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\Report\ScheduledReportController;
 use App\Http\Controllers\RoleController;
-use App\Http\Controllers\Support\TicketCommentController;
-use App\Http\Controllers\Support\TicketController;
+use App\Http\Controllers\TicketCommentController;
+use App\Http\Controllers\TicketController;
 use App\Http\Controllers\User\UserAreaController;
 use App\Http\Controllers\User\UserController;
 use App\Http\Controllers\User\UserPermissionController;
@@ -272,12 +272,14 @@ Route::prefix("v1")->group(function () {
                 Route::get("{alert}/notifications", "notifications");
             });
 
-        // Tickets
+        // Tickets - Enhanced with lifecycle actions
         Route::apiResource("tickets", TicketController::class);
         Route::prefix("tickets")->group(function () {
             Route::controller(TicketController::class)->group(function () {
-                Route::patch("{ticket}/status", "changeStatus");
                 Route::patch("{ticket}/assign", "assign");
+                Route::patch("{ticket}/resolve", "resolve");
+                Route::patch("{ticket}/close", "close");
+                Route::patch("{ticket}/reopen", "reopen");
             });
 
             Route::controller(TicketCommentController::class)->group(

@@ -35,9 +35,14 @@ return new class extends Migration {
             $table->enum("priority", TicketPriority::values())
                 ->default(TicketPriority::Medium->value);
 
-            // Timestamps
+            // Resolution tracking
             $table->timestamp("resolved_at")->nullable();
+            $table->foreignId("resolved_by")->nullable()->constrained("users")->onDelete("set null");
+
+            // Closure tracking
             $table->timestamp("closed_at")->nullable();
+            $table->foreignId("closed_by")->nullable()->constrained("users")->onDelete("set null");
+
             $table->timestamps();
             $table->softDeletes();
 
@@ -48,6 +53,8 @@ return new class extends Migration {
             $table->index("status", "idx_tickets_status");
             $table->index("priority", "idx_tickets_priority");
             $table->index("created_at", "idx_tickets_created_at");
+            $table->index("resolved_by", "idx_tickets_resolved_by");
+            $table->index("closed_by", "idx_tickets_closed_by");
         });
     }
 

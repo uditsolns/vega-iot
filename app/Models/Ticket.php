@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
-use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class Ticket extends Model
@@ -32,7 +31,9 @@ class Ticket extends Model
         'priority',
         'assigned_to',
         'resolved_at',
+        'resolved_by',
         'closed_at',
+        'closed_by',
     ];
 
     /**
@@ -54,7 +55,7 @@ class Ticket extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['priority', 'subject', 'description'])
+            ->logOnly(['priority', 'subject', 'description', 'status', 'assigned_to'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('ticket')
@@ -73,6 +74,16 @@ class Ticket extends Model
     public function assignedTo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function resolvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
     }
 
     public function company(): BelongsTo
@@ -187,9 +198,12 @@ class Ticket extends Model
     }
 
     /**
-     * Methods
+     * Lifecycle Methods
      */
 
+    /**
+     * Assign ticket to a user
+     */
     public function assign(User $user): bool
     {
         $this->assigned_to = $user->id;
@@ -202,42 +216,105 @@ class Ticket extends Model
         return $this->save();
     }
 
-    public function changeStatus(string|TicketStatus $status): bool
+    /**
+     * Mark ticket as resolved
+     */
+    public function resolve(User $resolvedBy): bool
     {
-        $newStatus = $status instanceof TicketStatus ? $status : TicketStatus::from($status);
+        if (!$this->status->canTransitionTo(TicketStatus::Resolved)) {
+            return false;
+        }
 
-        $this->status = $newStatus;
+        $this->status = TicketStatus::Resolved;
+        $this->resolved_at = now();
+        $this->resolved_by = $resolvedBy->id;
 
-        // Set timestamps based on status
-        if ($newStatus === TicketStatus::Resolved && !$this->resolved_at) {
+        return $this->save();
+    }
+
+    /**
+     * Close the ticket
+     */
+    public function close(User $closedBy): bool
+    {
+        if (!$this->status->canTransitionTo(TicketStatus::Closed)) {
+            return false;
+        }
+
+        $this->status = TicketStatus::Closed;
+        $this->closed_at = now();
+        $this->closed_by = $closedBy->id;
+
+        // Set resolved_at if not already set
+        if (!$this->resolved_at) {
             $this->resolved_at = now();
-        }
-
-        if ($newStatus === TicketStatus::Closed && !$this->closed_at) {
-            $this->closed_at = now();
-        }
-
-        // Clear timestamps if reopened
-        if ($newStatus === TicketStatus::Reopened) {
-            $this->resolved_at = null;
-            $this->closed_at = null;
+            $this->resolved_by = $closedBy->id;
         }
 
         return $this->save();
     }
 
-    public function close(): bool
-    {
-        return $this->changeStatus(TicketStatus::Closed);
-    }
-
-    public function resolve(): bool
-    {
-        return $this->changeStatus(TicketStatus::Resolved);
-    }
-
+    /**
+     * Reopen the ticket
+     */
     public function reopen(): bool
     {
-        return $this->changeStatus(TicketStatus::Reopened);
+        if (!$this->status->canTransitionTo(TicketStatus::Reopened)) {
+            return false;
+        }
+
+        $this->status = TicketStatus::Reopened;
+        $this->resolved_at = null;
+        $this->resolved_by = null;
+        $this->closed_at = null;
+        $this->closed_by = null;
+
+        return $this->save();
+    }
+
+    /**
+     * Check if user is the ticket creator
+     */
+    public function isCreatedBy(User $user): bool
+    {
+        return $this->user_id === $user->id;
+    }
+
+    /**
+     * Check if user is assigned to the ticket
+     */
+    public function isAssignedTo(User $user): bool
+    {
+        return $this->assigned_to === $user->id;
+    }
+
+    /**
+     * Check if user can see internal comments
+     * Only VEGA's internal support team can see internal comments
+     * Customer users (even if they created the ticket) CANNOT see internal comments
+     */
+    public function canUserSeeInternalComments(User $user): bool
+    {
+        // Customer users (those with company_id) can NEVER see internal comments
+        if ($user->company_id !== null) {
+            return false;
+        }
+
+        // VEGA's super admins can see all internal comments
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        // VEGA's support staff assigned to ticket can see internal comments
+        if ($this->isAssignedTo($user)) {
+            return true;
+        }
+
+        // VEGA's users with permission can see internal comments
+        if ($user->hasPermission('tickets.view_internal_comments')) {
+            return true;
+        }
+
+        return false;
     }
 }

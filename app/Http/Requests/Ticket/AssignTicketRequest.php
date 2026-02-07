@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Ticket;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class AssignTicketRequest extends FormRequest
 {
@@ -16,6 +18,28 @@ class AssignTicketRequest extends FormRequest
         return [
             "assigned_to" => ["required", "integer", "exists:users,id"],
         ];
+    }
+
+    /**
+     * Configure the validator instance.
+     * Ensure the assigned user is VEGA's internal support (company_id is null)
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function ($validator) {
+            $userId = $this->input('assigned_to');
+            if ($userId) {
+                $user = User::find($userId);
+
+                // Ensure user is VEGA's internal support (not a customer user)
+                if ($user && $user->company_id !== null) {
+                    $validator->errors()->add(
+                        'assigned_to',
+                        'Only VEGA internal support users can be assigned to tickets. Customer users cannot be assigned.'
+                    );
+                }
+            }
+        });
     }
 
     public function messages(): array

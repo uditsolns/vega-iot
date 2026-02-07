@@ -5,6 +5,7 @@ namespace App\Services\Support;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
+use App\Notifications\TicketCommentAddedNotification;
 use Illuminate\Database\Eloquent\Collection;
 
 class TicketCommentService
@@ -28,6 +29,23 @@ class TicketCommentService
         // Update ticket's updated_at timestamp
         $ticket->touch();
 
+        // Audit log
+        $commentType = $comment->is_internal ? 'internal comment' : 'comment';
+        activity("ticket")
+            ->event('comment_added')
+            ->performedOn($ticket)
+            ->withProperties([
+                'ticket_id' => $ticket->id,
+                'comment_id' => $comment->id,
+                'is_internal' => $comment->is_internal,
+            ])
+            ->log("Added {$commentType} to ticket \"{$ticket->subject}\"");
+
+        // Send notifications for external comments only
+        if (!$comment->is_internal) {
+            $this->sendCommentNotifications($ticket, $comment, $user);
+        }
+
         return $comment->load(['user']);
     }
 
@@ -50,5 +68,35 @@ class TicketCommentService
             ->with(['user'])
             ->orderBy('created_at')
             ->get();
+    }
+
+    /**
+     * Send notifications when a comment is added
+     */
+    private function sendCommentNotifications(Ticket $ticket, TicketComment $comment, User $commentedBy): void
+    {
+        // Notify ticket creator if someone else commented
+        if ($ticket->user_id !== $commentedBy->id) {
+            $ticket->user->notify(
+                new TicketCommentAddedNotification(
+                    ticketId: $ticket->id,
+                    commentId: $comment->id,
+                    commentText: $comment->comment,
+                    commentedBy: $commentedBy->id,
+                )
+            );
+        }
+
+        // Notify assigned user if someone else commented
+        if ($ticket->assigned_to && $ticket->assigned_to !== $commentedBy->id) {
+            $ticket->assignedTo->notify(
+                new TicketCommentAddedNotification(
+                    ticketId: $ticket->id,
+                    commentId: $comment->id,
+                    commentText: $comment->comment,
+                    commentedBy: $commentedBy->id,
+                )
+            );
+        }
     }
 }
