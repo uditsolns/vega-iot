@@ -1,3 +1,18 @@
+@php
+    $dataFormation = $data['data_formation'] ?? 'single_temperature';
+
+    $showHumidity = in_array($dataFormation, [
+        'combined_temperature_humidity',
+        'separate_temperature_humidity',
+        'combined_probe_temperature_humidity'
+    ]);
+
+    $showProbe = in_array($dataFormation, [
+        'combined_probe_temperature',
+        'combined_probe_temperature_humidity'
+    ]);
+@endphp
+
 <div class="section-title">Logger Summary</div>
 
 <div class="info-grid">
@@ -31,31 +46,27 @@
         <span class="value">{{ $data['max_temp'] ?? '50' }} °C</span>
     </div>
 
-    @if(isset($data['min_hum']))
-        <div class="info-row">
-            <span class="label">Min Set Humidity:</span>
-            <span class="value">{{ $data['min_hum'] }} %RH</span>
-        </div>
-    @endif
-
-    @if(isset($data['max_hum']))
-        <div class="info-row">
-            <span class="label">Max Set Humidity:</span>
-            <span class="value">{{ $data['max_hum'] }} %RH</span>
-        </div>
-    @endif
-
-    @if(isset($data['min_tempprobe']))
+    @if($showProbe)
         <div class="info-row">
             <span class="label">Min Set Temp Probe:</span>
-            <span class="value">{{ $data['min_tempprobe'] }} °C</span>
+            <span class="value">{{ $data['min_tempprobe'] ?? '20' }} °C</span>
+        </div>
+
+        <div class="info-row">
+            <span class="label">Max Set Temp Probe:</span>
+            <span class="value">{{ $data['max_tempprobe'] ?? '50' }} °C</span>
         </div>
     @endif
 
-    @if(isset($data['max_tempprobe']))
+    @if($showHumidity)
         <div class="info-row">
-            <span class="label">Max Set Temp Probe:</span>
-            <span class="value">{{ $data['max_tempprobe'] }} °C</span>
+            <span class="label">Min Set Humidity:</span>
+            <span class="value">{{ $data['min_hum'] ?? '40' }} %RH</span>
+        </div>
+
+        <div class="info-row">
+            <span class="label">Max Set Humidity:</span>
+            <span class="value">{{ $data['max_hum'] ?? '90' }} %RH</span>
         </div>
     @endif
 </div>

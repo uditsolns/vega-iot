@@ -97,22 +97,4 @@ class RolePolicy
         // User can only delete roles in their own company
         return $user->company_id === $role->company_id;
     }
-
-    /**
-     * Determine whether the user can restore the model.
-     */
-    public function restore(User $user, Role $role): bool
-    {
-        // Same rules as delete
-        return $this->delete($user, $role);
-    }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
-    public function forceDelete(User $user, Role $role): bool
-    {
-        // Same rules as delete
-        return $this->delete($user, $role);
-    }
 }

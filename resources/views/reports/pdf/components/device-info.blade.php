@@ -1,3 +1,18 @@
+@php
+    $dataFormation = $data['data_formation'] ?? 'single_temperature';
+
+    $showHumidity = in_array($dataFormation, [
+        'combined_temperature_humidity',
+        'separate_temperature_humidity',
+        'combined_probe_temperature_humidity'
+    ]);
+
+    $showProbe = in_array($dataFormation, [
+        'combined_probe_temperature',
+        'combined_probe_temperature_humidity'
+    ]);
+@endphp
+
 <div class="section-title">Device Info</div>
 
 <div class="info-grid">
@@ -36,31 +51,27 @@
         <span class="value">± {{ $data['temp_acc'] ?? '0.5' }} °C</span>
     </div>
 
-    @if(isset($data['hum_res']))
-        <div class="info-row">
-            <span class="label">Humidity Resolution:</span>
-            <span class="value">{{ $data['hum_res'] }} %RH</span>
-        </div>
-    @endif
-
-    @if(isset($data['hum_acc']))
-        <div class="info-row">
-            <span class="label">Humidity Accuracy:</span>
-            <span class="value">± {{ $data['hum_acc'] }} %RH</span>
-        </div>
-    @endif
-
-    @if(isset($data['tempprobe_res']))
+    @if($showProbe)
         <div class="info-row">
             <span class="label">Temp Probe Resolution:</span>
-            <span class="value">{{ $data['tempprobe_res'] }} °C</span>
+            <span class="value">{{ $data['tempprobe_res'] ?? '0.1' }} °C</span>
+        </div>
+
+        <div class="info-row">
+            <span class="label">Temp Probe Accuracy:</span>
+            <span class="value">± {{ $data['tempprobe_acc'] ?? '0.5' }} °C</span>
         </div>
     @endif
 
-    @if(isset($data['tempprobe_acc']))
+    @if($showHumidity)
         <div class="info-row">
-            <span class="label">Temp Probe Accuracy:</span>
-            <span class="value">± {{ $data['tempprobe_acc'] }} °C</span>
+            <span class="label">Humidity Resolution:</span>
+            <span class="value">{{ $data['hum_res'] ?? '1.0' }} %RH</span>
+        </div>
+
+        <div class="info-row">
+            <span class="label">Humidity Accuracy:</span>
+            <span class="value">± {{ $data['hum_acc'] ?? '3.0' }} %RH</span>
         </div>
     @endif
 </div>

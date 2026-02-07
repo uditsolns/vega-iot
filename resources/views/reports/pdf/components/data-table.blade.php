@@ -23,31 +23,27 @@
 <table class="data-table">
     <thead>
     <tr>
-        <th style="width: 5%;">Sr. No.</th>
-        <th style="width: 18%;">Date</th>
-        <th style="width: 10%;">Time</th>
+        <th style="width: 8%;">Sr. No.</th>
+        <th style="width: 25%;">Date & Time</th>
 
         @if(in_array('temperature', $columns))
-            <th style="width: {{ count($columns) > 1 ? '11%' : '22%' }};">Temp (°C)</th>
+            <th style="width: {{ count($columns) === 1 ? '67%' : (count($columns) === 2 ? '33.5%' : '22.33%') }};">Temperature (°C)</th>
         @endif
 
         @if(in_array('tempprobe', $columns))
-            <th style="width: {{ count($columns) > 2 ? '11%' : '22%' }};">Probe (°C)</th>
+            <th style="width: {{ count($columns) === 2 ? '33.5%' : '22.33%' }};">Temp Probe (°C)</th>
         @endif
 
         @if(in_array('humidity', $columns))
-            <th style="width: {{ count($columns) > 1 ? '11%' : '22%' }};">Humidity (%RH)</th>
+            <th style="width: {{ count($columns) === 2 ? '33.5%' : '22.33%' }};">Humidity (%RH)</th>
         @endif
-
-        <th style="width: 22%;">Remarks</th>
     </tr>
     </thead>
     <tbody>
     @foreach($logs as $index => $log)
         <tr>
             <td>{{ $index + 1 }}</td>
-            <td>{{ \Carbon\Carbon::parse($log['timestamp'])->format('d-m-Y') }}</td>
-            <td>{{ \Carbon\Carbon::parse($log['timestamp'])->format('H:i:s') }}</td>
+            <td>{{ $log['timestamp'] }}</td>
 
             @if(in_array('temperature', $columns))
                 @php
@@ -93,8 +89,6 @@
                     {{ $log['humidity'] !== null ? number_format($log['humidity'], 1) : 'N/A' }}
                 </td>
             @endif
-
-            <td style="text-align: left; padding-left: 5px;"></td>
         </tr>
     @endforeach
     </tbody>
