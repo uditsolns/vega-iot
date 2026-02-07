@@ -29,12 +29,9 @@ class AuditReportController extends Controller
         return $this->success($reports);
     }
 
-    /**
-     * @throws MpdfException
-     */
     public function store(CreateAuditReportRequest $request): Response
     {
-//        $this->authorize('create', AuditReport::class);
+        $this->authorize('create', AuditReport::class);
 
         $report = $this->auditReportService->create(
             $request->validated(),
@@ -49,9 +46,6 @@ class AuditReportController extends Controller
         ]);
     }
 
-    /**
-     * @throws MpdfException
-     */
     public function download(AuditReport $auditReport): Response
     {
         $this->authorize('view', $auditReport);

@@ -4,34 +4,12 @@ namespace App\Services\Audit\PDF;
 
 use App\Models\AuditReport;
 use Illuminate\Support\Facades\View;
-use Mpdf\Mpdf;
-use Mpdf\MpdfException;
+use Spatie\Browsershot\Browsershot;
 
 class AuditPdfGeneratorService
 {
-    private Mpdf $mpdf;
-
     /**
-     * @throws MpdfException
-     */
-    public function __construct()
-    {
-        $this->mpdf = new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4-L',
-            'orientation' => 'L',
-            'margin_left' => 10,
-            'margin_right' => 10,
-            'margin_top' => 20,
-            'margin_bottom' => 20,
-            'margin_header' => 5,
-            'margin_footer' => 9,
-            'tempDir' => storage_path('app/temp'),
-        ]);
-    }
-
-    /**
-     * @throws MpdfException
+     * Generate PDF using Browsershot
      */
     public function generate(AuditReport $report, array $activities, array $resourceData): string
     {
@@ -44,10 +22,19 @@ class AuditPdfGeneratorService
             'generated_by' => $report->generatedBy->email,
         ];
 
+        // Generate HTML
         $html = View::make('audit-reports.main', $data)->render();
-        $this->mpdf->WriteHTML($html);
 
-        return $this->mpdf->Output('', 'S');
+        // Generate PDF with Browsershot
+        return Browsershot::html($html)
+            ->setOption('landscape', true)
+            ->format('A4')
+            ->margins(10, 10, 10, 10)
+            ->showBackground()
+            ->waitUntilNetworkIdle()
+            ->timeout(120)
+            ->setOption('args', ['--disable-gpu', '--no-sandbox'])
+            ->pdf();
     }
 
     private function formatActivities(array $activities, string $reportType): array

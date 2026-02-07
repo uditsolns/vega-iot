@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Notifications\AuditReportNotification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Notification;
-use Mpdf\MpdfException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -56,7 +55,7 @@ readonly class AuditReportService
     }
 
     /**
-     * @throws MpdfException
+     * Generate audit report PDF
      */
     public function generateReport(AuditReport $report): string
     {
@@ -65,7 +64,6 @@ readonly class AuditReportService
 
     /**
      * Generate and send audit report via email
-     * @throws MpdfException
      */
     public function generateAndSend(AuditReport $report, array $recipientEmails = []): string
     {
@@ -98,7 +96,7 @@ readonly class AuditReportService
             Notification::send($recipients, $notification);
         }
 
-        // Cleanup temp file after sending
+        // Cleanup temp file after sending (optional - uncomment if needed)
         // if (file_exists($tempPath)) {
         //     @unlink($tempPath);
         // }

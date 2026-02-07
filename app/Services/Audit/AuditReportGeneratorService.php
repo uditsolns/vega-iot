@@ -7,7 +7,6 @@ use App\Models\AuditReport;
 use App\Models\Device;
 use App\Models\User;
 use App\Services\Audit\PDF\AuditPdfGeneratorService;
-use Mpdf\MpdfException;
 use Spatie\Activitylog\Models\Activity;
 
 readonly class AuditReportGeneratorService
@@ -17,7 +16,7 @@ readonly class AuditReportGeneratorService
     ) {}
 
     /**
-     * @throws MpdfException
+     * Generate audit report PDF
      */
     public function generate(AuditReport $report): string
     {
