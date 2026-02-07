@@ -9,7 +9,6 @@ use App\Models\Report;
 use App\Services\Report\ReportService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Mpdf\MpdfException;
 
 class ReportController extends Controller
 {
@@ -27,9 +26,6 @@ class ReportController extends Controller
         return $this->collection(ReportResource::collection($reports));
     }
 
-    /**
-     * @throws MpdfException
-     */
     public function store(CreateReportRequest $request): Response
     {
         $this->authorize("create", Report::class);
@@ -40,7 +36,7 @@ class ReportController extends Controller
             $request->user(),
         );
 
-        $pdfContent = $this->reportService->generateAndSend($report);
+        $pdfContent = $this->reportService->generate($report);
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
@@ -48,9 +44,6 @@ class ReportController extends Controller
         ]);
     }
 
-    /**
-     * @throws MpdfException
-     */
     public function download(Report $report) {
         $this->authorize("viewAny", Report::class);
 

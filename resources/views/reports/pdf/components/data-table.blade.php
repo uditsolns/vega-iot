@@ -1,21 +1,13 @@
 @php
-    // Helper function to determine color class based on thresholds
     function getColorClass($value, $min, $max, $minWarn = null, $maxWarn = null) {
         if ($value === null) return 'normal';
 
-        $low = min($min ?? PHP_FLOAT_MAX, $max ?? PHP_FLOAT_MAX);
-        $high = max($min ?? PHP_FLOAT_MIN, $max ?? PHP_FLOAT_MIN);
-
-        // Critical if outside min/max
         if (($min !== null && $value < $min) || ($max !== null && $value > $max)) {
             return 'critical';
         }
 
-        // Warning if outside warning thresholds (if provided)
         if ($minWarn !== null && $maxWarn !== null) {
-            $lowWarn = min($minWarn, $maxWarn);
-            $highWarn = max($minWarn, $maxWarn);
-            if ($value < $lowWarn || $value > $highWarn) {
+            if ($value < $minWarn || $value > $maxWarn) {
                 return 'warning';
             }
         }
@@ -23,6 +15,8 @@
         return 'normal';
     }
 @endphp
+
+<div class="page-break"></div>
 
 <div class="subsection-title">Tabular Data</div>
 
@@ -34,25 +28,15 @@
         <th style="width: 10%;">Time</th>
 
         @if(in_array('temperature', $columns))
-            <th style="width: {{ in_array('tempprobe', $columns) || in_array('humidity', $columns) ? '11%' : '22%' }};">
-                Temperature<br/>(°C)
-            </th>
+            <th style="width: {{ count($columns) > 1 ? '11%' : '22%' }};">Temp (°C)</th>
         @endif
 
         @if(in_array('tempprobe', $columns))
-            <th style="width: {{ in_array('humidity', $columns) ? '11%' : '22%' }};">
-                Temp Probe<br/>(°C)
-            </th>
+            <th style="width: {{ count($columns) > 2 ? '11%' : '22%' }};">Probe (°C)</th>
         @endif
 
         @if(in_array('humidity', $columns))
-            <th style="width: {{ in_array('temperature', $columns) || in_array('tempprobe', $columns) ? '11%' : '22%' }};">
-                Humidity<br/>(%RH)
-            </th>
-        @endif
-
-        @if(in_array('alarm', $columns))
-            <th style="width: 12%;">Alarm Status</th>
+            <th style="width: {{ count($columns) > 1 ? '11%' : '22%' }};">Humidity (%RH)</th>
         @endif
 
         <th style="width: 22%;">Remarks</th>
@@ -71,8 +55,8 @@
                         $log['temperature'] ?? null,
                         $data['min_temp'] ?? null,
                         $data['max_temp'] ?? null,
-                        $data['min_temp_warn'] ?? null,
-                        $data['max_temp_warn'] ?? null
+                        $data['min_warn_temp'] ?? null,
+                        $data['max_warn_temp'] ?? null
                     );
                 @endphp
                 <td class="{{ $tempClass }}">
@@ -86,8 +70,8 @@
                         $log['tempprobe'] ?? null,
                         $data['min_tempprobe'] ?? null,
                         $data['max_tempprobe'] ?? null,
-                        $data['min_tempprobe_warn'] ?? null,
-                        $data['max_tempprobe_warn'] ?? null
+                        $data['min_warn_tempProbe'] ?? null,
+                        $data['max_Warn_tempProbe'] ?? null
                     );
                 @endphp
                 <td class="{{ $probeClass }}">
@@ -101,8 +85,8 @@
                         $log['humidity'] ?? null,
                         $data['min_hum'] ?? null,
                         $data['max_hum'] ?? null,
-                        $data['min_hum_warn'] ?? null,
-                        $data['max_hum_warn'] ?? null
+                        $data['min_warn_hum'] ?? null,
+                        $data['max_warn_hum'] ?? null
                     );
                 @endphp
                 <td class="{{ $humClass }}">
@@ -110,23 +94,12 @@
                 </td>
             @endif
 
-            @if(in_array('alarm', $columns))
-                <td>{{ $log['alarm_status'] ?? 'Normal' }}</td>
-            @endif
-
-            <td style="text-align: left; padding-left: 5px;">
-                {{ $log['remarks'] ?? '' }}
-            </td>
+            <td style="text-align: left; padding-left: 5px;"></td>
         </tr>
     @endforeach
     </tbody>
 </table>
 
-{{-- Summary at bottom of table --}}
-<div style="margin-top: 10px; font-size: 8pt;">
+<div style="margin-top: 10px; font-size: 7pt;">
     <span class="label">Total Records:</span> {{ count($logs) }}
-    @if(isset($data['out_of_range_count']))
-        <span style="margin-left: 15px;" class="label">Out of Range:</span>
-        <span class="critical">{{ $data['out_of_range_count'] }}</span>
-    @endif
 </div>

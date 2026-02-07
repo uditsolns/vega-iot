@@ -3,46 +3,20 @@
 namespace App\Services\Report\PDF;
 
 use App\DTOs\ReportGenerationDTO;
-use App\Enums\ReportFormat;
-use App\Models\Device;
 use Illuminate\Support\Facades\View;
-use Mpdf\Mpdf;
-use Mpdf\MpdfException;
+use Spatie\Browsershot\Browsershot;
+use Spatie\Browsershot\Exceptions\CouldNotTakeBrowsershot;
 
 class PdfGeneratorService
 {
-    private Mpdf $mpdf;
-
     /**
-     * @throws MpdfException
-     */
-    public function __construct()
-    {
-        // Initialize mPDF with settings
-        $this->mpdf = new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'orientation' => 'P',
-            'margin_left' => 10,
-            'margin_right' => 10,
-            'margin_top' => 25,
-            'margin_bottom' => 20,
-            'margin_header' => 9,
-            'margin_footer' => 9,
-            'tempDir' => storage_path('app/temp'),
-        ]);
-    }
-
-    /**
-     * Generate PDF based on report format
-     * @throws MpdfException
+     * Generate PDF using Browsershot + Chart.js
      */
     public function generate(
         ReportGenerationDTO $reportDto,
-        Device $device,
         array $readingsData
     ): string {
-        // Merge all data for template
+        // Merge data
         $data = array_merge(
             $readingsData['device_info'],
             $readingsData['report_info'],
@@ -50,53 +24,24 @@ class PdfGeneratorService
         );
         $data['logs'] = $readingsData['logs'];
         $data['user_name'] = auth()->user()?->email ?? 'System';
+        $data['data_formation'] = $reportDto->dataFormation->value;
 
-        // Generate PDF based on format
-        match ($reportDto->format) {
-            ReportFormat::Graphical => $this->generateGraphical($data, $reportDto),
-            ReportFormat::Tabular => $this->generateTabular($data, $reportDto),
-            ReportFormat::Both => $this->generateBoth($data, $reportDto),
+        // Generate HTML based on format
+        $html = match ($reportDto->format->value) {
+            'graphical' => View::make('reports.pdf.graphical', compact('data'))->render(),
+            'tabular' => View::make('reports.pdf.tabular', compact('data'))->render(),
+            default => View::make('reports.pdf.graphical-tabular', compact('data'))->render(),
         };
 
-        return $this->mpdf->Output('', 'S');
-    }
-
-    /**
-     * Generate graphical report (device info + charts)
-     * @throws MpdfException
-     */
-    private function generateGraphical(array $data, ReportGenerationDTO $reportDto): void
-    {
-        $html = View::make('reports.pdf.graphical', [
-            'data' => $data,
-            'report' => $reportDto
-        ])->render();
-        $this->mpdf->WriteHTML($html);
-    }
-
-    /**
-     * Generate tabular report (device info + data table)
-     * @throws MpdfException
-     */
-    private function generateTabular(array $data, ReportGenerationDTO $reportDto): void
-    {
-        $html = View::make('reports.pdf.tabular', [
-            'data' => $data,
-            'report' => $reportDto
-        ])->render();
-        $this->mpdf->WriteHTML($html);
-    }
-
-    /**
-     * Generate combined report (device info + charts + table)
-     * @throws MpdfException
-     */
-    private function generateBoth(array $data, ReportGenerationDTO $reportDto): void
-    {
-        $html = View::make('reports.pdf.graphical-tabular', [
-            'data' => $data,
-            'report' => $reportDto
-        ])->render();
-        $this->mpdf->WriteHTML($html);
+        // Generate PDF with Browsershot
+        return Browsershot::html($html)
+            ->setOption('landscape', false)
+            ->format('A4')
+            ->margins(10, 10, 10, 10)
+            ->showBackground()
+            ->waitUntilNetworkIdle()
+            ->timeout(120)
+            ->setOption('args', ['--disable-gpu', '--no-sandbox'])
+            ->pdf();
     }
 }

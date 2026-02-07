@@ -30,10 +30,8 @@ use App\Policies\RolePolicy;
 use App\Policies\TicketPolicy;
 use App\Policies\UserPolicy;
 use App\Policies\ValidationStudyPolicy;
+use App\Services\Report\PDF\PdfGeneratorService;
 use Illuminate\Support\Facades\Gate;
-use App\Events\ReadingReceived;
-use App\Listeners\ProcessReadingForAlertsListener;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,7 +41,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PdfGeneratorService::class);
     }
 
     /**

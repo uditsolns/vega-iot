@@ -9,8 +9,9 @@ use App\Enums\ReportFileType;
 use App\Models\Device;
 use App\Models\DeviceReading;
 use App\Services\Report\PDF\PdfGeneratorService;
+use Carbon\Carbon;
 use Exception;
-use Mpdf\MpdfException;
+use Illuminate\Support\Facades\DB;
 
 readonly class ReportGeneratorService
 {
@@ -20,7 +21,6 @@ readonly class ReportGeneratorService
 
     /**
      * Generate report from a Reportable entity
-     * @throws MpdfException
      */
     public function generateFromReportable(ReportableInterface $reportable): string
     {
@@ -30,77 +30,117 @@ readonly class ReportGeneratorService
 
     /**
      * Generate report from a DTO
-     * @throws MpdfException
      */
     public function generate(ReportGenerationDTO $dto): string
     {
-        // Load device with necessary relationships
         $device = Device::with([
             'company',
             'area.hub.location',
             'currentConfiguration'
         ])->findOrFail($dto->deviceId);
 
-        // Fetch readings data
         $readingsData = $this->fetchReadingsData($dto, $device);
 
-        // Determine generation method based on file type
         return match ($dto->fileType) {
-            ReportFileType::Pdf => $this->generatePdf($dto, $device, $readingsData),
-            ReportFileType::Csv => $this->generateCsv($dto, $device, $readingsData),
+            ReportFileType::Pdf => $this->generatePdf($dto, $readingsData),
+            ReportFileType::Csv => $this->generateCsv($dto, $readingsData),
         };
     }
 
     /**
      * Generate PDF report
-     * @throws MpdfException
      */
     private function generatePdf(
         ReportGenerationDTO $dto,
-        Device $device,
         array $readingsData
     ): string {
         return $this->pdfGenerator->generate(
             reportDto: $dto,
-            device: $device,
             readingsData: $readingsData
         );
     }
 
     /**
-     * Generate CSV report (future implementation)
+     * Generate CSV report
      * @throws Exception
      */
     private function generateCsv(
         ReportGenerationDTO $dto,
-        Device $device,
         array $readingsData
     ): string {
-        // TODO: Implement CSV generation in Phase 2
         throw new Exception('CSV generation not yet implemented');
     }
 
     /**
-     * Fetch readings data based on report parameters
+     * Fetch readings data - OPTIMIZED with TimescaleDB
      */
     private function fetchReadingsData(ReportGenerationDTO $dto, Device $device): array
     {
-        $query = DeviceReading::where('device_id', $device->id)
-            ->whereBetween('recorded_at', [
-                $dto->fromDatetime,
-                $dto->toDatetime
-            ])
-            ->orderBy('recorded_at');
+        // Use time_bucket for aggregation if interval-based sampling needed
+        $intervalMinutes = $dto->interval;
 
-        // Get all readings
-        $readings = $query->get();
+        // For large datasets, use TimescaleDB time_bucket aggregation
+        if ($this->shouldUseAggregation($dto)) {
+            $readings = $this->fetchAggregatedReadings($dto, $device, $intervalMinutes);
+        } else {
+            // Direct query for smaller datasets
+            $readings = DeviceReading::where('device_id', $device->id)
+                ->whereBetween('recorded_at', [
+                    $dto->fromDatetime,
+                    $dto->toDatetime
+                ])
+                ->orderBy('recorded_at')
+                ->get();
+        }
 
-        // Format data based on device type and data formation
         return $this->formatReadingsData($readings, $device, $dto);
     }
 
     /**
-     * Format readings data based on device type and data formation enum
+     * Check if aggregation should be used based on data volume
+     */
+    private function shouldUseAggregation(ReportGenerationDTO $dto): bool
+    {
+        $hours = $dto->fromDatetime->diffInHours($dto->toDatetime);
+        $estimatedRecords = ($hours * 60) / 5; // Assuming 5-min default interval
+
+        return $estimatedRecords > 10000; // Aggregate if > 10k records
+    }
+
+    /**
+     * Fetch aggregated readings using TimescaleDB time_bucket
+     */
+    private function fetchAggregatedReadings(ReportGenerationDTO $dto, Device $device, int $intervalMinutes)
+    {
+        $bucketInterval = max($intervalMinutes, 15); // Minimum 15-min buckets
+
+        return DB::table('device_readings')
+            ->select([
+                DB::raw("time_bucket('{$bucketInterval} minutes', recorded_at) as timestamp"),
+                DB::raw('AVG(temperature) as temperature'),
+                DB::raw('AVG(humidity) as humidity'),
+                DB::raw('AVG(temp_probe) as temp_probe'),
+            ])
+            ->where('device_id', $device->id)
+            ->whereBetween('recorded_at', [
+                $dto->fromDatetime,
+                $dto->toDatetime
+            ])
+            ->groupBy(DB::raw('1'))
+            ->orderBy('timestamp')
+            ->get()
+            ->map(function ($row) {
+                return (object) [
+                    'recorded_at' => Carbon::parse($row->timestamp),
+                    'temperature' => $row->temperature ? round($row->temperature, 2) : null,
+                    'humidity' => $row->humidity ? round($row->humidity, 2) : null,
+                    'temp_probe' => $row->temp_probe ? round($row->temp_probe, 2) : null,
+                ];
+            });
+    }
+
+    /**
+     * Format readings data
      */
     private function formatReadingsData($readings, Device $device, ReportGenerationDTO $dto): array
     {
@@ -115,7 +155,6 @@ readonly class ReportGeneratorService
                 'timestamp' => $reading->recorded_at->format('d-m-Y H:i:s'),
             ];
 
-            // Add data based on device type and data formation
             switch ($dto->dataFormation) {
                 case ReportDataFormation::SingleTemperature:
                     $log['temperature'] = $reading->temperature;
@@ -142,14 +181,13 @@ readonly class ReportGeneratorService
             $formattedData['logs'][] = $log;
         }
 
-        // Calculate statistics
         $formattedData['statistics'] = $this->calculateStatistics($readings, $dto->dataFormation);
 
         return $formattedData;
     }
 
     /**
-     * Get device information for report
+     * Get device information
      */
     private function getDeviceInfo(Device $device): array
     {
@@ -170,7 +208,7 @@ readonly class ReportGeneratorService
     }
 
     /**
-     * Get report configuration information
+     * Get report configuration
      */
     private function getReportInfo(ReportGenerationDTO $dto, Device $device): array
     {
@@ -199,7 +237,7 @@ readonly class ReportGeneratorService
     }
 
     /**
-     * Calculate statistics from readings
+     * Calculate statistics
      */
     private function calculateStatistics($readings, ReportDataFormation $dataFormation): array
     {
@@ -221,8 +259,6 @@ readonly class ReportGeneratorService
             $stats['minTempData'] = $temps->min();
             $stats['maxTempData'] = $temps->max();
             $stats['avgTemp'] = round($temps->avg(), 2);
-
-            // Calculate MKT (Mean Kinetic Temperature)
             $stats['mkt'] = $this->calculateMKT($temps->toArray());
         }
 
@@ -238,7 +274,7 @@ readonly class ReportGeneratorService
             $stats['avgHum'] = round($humidity->avg(), 2);
         }
 
-        // Temperature Probe statistics
+        // Temp Probe statistics
         if (in_array($dataFormation, [
             ReportDataFormation::CombinedProbeTemperature,
             ReportDataFormation::CombinedProbeTemperatureHumidity,

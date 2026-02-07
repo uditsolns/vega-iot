@@ -5,9 +5,7 @@ namespace App\Services\Report;
 use App\Models\Report;
 use App\Models\User;
 use App\Notifications\ReportGeneratedNotification;
-use Exception;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Mpdf\MpdfException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -68,7 +66,6 @@ readonly class ReportService
 
     /**
      * Generate report file
-     * @throws MpdfException
      */
     public function generate(Report $report): string
     {
@@ -77,7 +74,6 @@ readonly class ReportService
 
     /**
      * Generate report file and send notification
-     * @throws MpdfException
      */
     public function generateAndSend(Report $report): string
     {

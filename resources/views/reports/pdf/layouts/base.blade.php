@@ -1,79 +1,134 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $data['report_name'] ?? 'Report' }}</title>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
     <style>
         @page {
-            margin: 25mm 10mm 20mm 10mm;
-            header: page-header;
-            footer: page-footer;
+            size: A4;
+            margin: 10mm 10mm 10mm 10mm;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-            font-family: 'DejaVu Sans', sans-serif;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
             font-size: 8pt;
-            color: #000000;
-            margin: 0;
-            padding: 0;
+            color: #000;
+            line-height: 1.4;
+        }
+
+        .page-header {
+            border-bottom: 0.5px solid #666;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-logo {
+            width: 50px;
+            height: auto;
+        }
+
+        .header-center {
+            text-align: center;
+            flex: 1;
+        }
+
+        .header-title {
+            color: #003366;
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 2px;
+        }
+
+        .header-subtitle {
+            font-size: 8pt;
+            color: #000;
+        }
+
+        .page-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-top: 0.5px solid #666;
+            padding: 5px 10mm;
+            font-size: 7pt;
+            background: white;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .footer-left {
+            flex: 1;
+        }
+
+        .footer-right {
+            text-align: right;
         }
 
         .section-title {
             color: #003366;
             font-weight: bold;
             font-size: 10pt;
-            margin-top: 10px;
-            margin-bottom: 5px;
+            margin: 10px 0 5px 0;
+            page-break-after: avoid;
         }
 
         .subsection-title {
             color: #003366;
             font-weight: bold;
-            font-size: 11pt;
-            margin-top: 8px;
-            margin-bottom: 5px;
+            font-size: 9pt;
+            margin: 8px 0 5px 0;
         }
 
         .info-grid {
-            width: 100%;
-            margin-bottom: 10px;
-        }
-
-        .info-left {
-            width: 38%;
-            float: left;
-        }
-
-        .info-right {
-            width: 58%;
-            float: right;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px 20px;
+            margin-bottom: 8px;
         }
 
         .info-row {
-            margin-bottom: 5px;
-            line-height: 1.4;
+            font-size: 8pt;
+            line-height: 1.5;
         }
 
         .label {
             font-weight: bold;
-            display: inline;
         }
 
         .value {
             font-weight: normal;
-            display: inline;
         }
 
         .divider {
-            border-top: 0.5px solid #666666;
+            border-top: 0.5px solid #666;
             margin: 8px 0;
-            clear: both;
         }
 
-        .clearfix::after {
-            content: "";
-            display: table;
-            clear: both;
+        /* Chart Styles */
+        .chart-container {
+            margin: 10px 0;
+            page-break-inside: avoid;
+            height: 300px;
+        }
+
+        .chart-container canvas {
+            max-height: 300px !important;
         }
 
         /* Table Styles */
@@ -81,26 +136,26 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            table-layout: fixed;
         }
 
         table.data-table th {
             background-color: #003366;
-            color: #ffffff;
+            color: #fff;
             font-weight: bold;
-            font-size: 8pt;
-            padding: 5px;
+            font-size: 7pt;
+            padding: 4px;
             text-align: center;
             border: 0.5px solid #bebebe;
         }
 
         table.data-table td {
             font-size: 6pt;
-            padding: 3px 5px;
+            padding: 2px 4px;
             text-align: center;
             border: 0.5px solid #bebebe;
         }
 
-        /* Color coding for values */
         .critical {
             color: #ff0000;
             font-weight: bold;
@@ -112,18 +167,51 @@
         }
 
         .normal {
-            color: #000000;
+            color: #000;
         }
 
-        /* Chart container */
-        .chart-container {
-            margin-top: 10px;
-            margin-bottom: 10px;
-            page-break-inside: avoid;
+        @media print {
+            .page-break {
+                page-break-before: always;
+            }
+
+            .no-break {
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
 <body>
+<!-- Header -->
+<div class="page-header">
+    <div style="width: 50px;">
+        <img src="{{ public_path('vega-logo.png') }}" class="header-logo" alt="Logo">
+    </div>
+    <div class="header-center">
+        <div class="header-title">Data Report</div>
+        <div class="header-subtitle">{{ $data['report_name'] ?? 'Report' }}</div>
+    </div>
+    <div style="width: 50px;"></div>
+</div>
+
+<!-- Content -->
 @yield('content')
+
+<!-- Footer -->
+<div class="page-footer">
+    <div class="footer-left">
+        <div>
+            <span>Report Generated by: </span>
+            <span style="color: #003366;">{{ $data['user_name'] ?? 'System' }}</span>
+            <span> @ {{ now()->format('d-m-Y H:i:s') }}</span>
+        </div>
+        <div style="margin-top: 3px;">
+            This is a computer-generated report, no signature is required ***
+        </div>
+    </div>
+    <div class="footer-right">
+        <div>Copyright © Vega™</div>
+    </div>
+</div>
 </body>
 </html>
