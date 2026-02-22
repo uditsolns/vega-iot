@@ -24,8 +24,6 @@ class AreaController extends Controller
 {
     public function __construct(
         private readonly AreaService $areaService,
-        private readonly AlertService $alertService,
-        private readonly ReadingQueryService $readingQueryService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -172,39 +170,5 @@ class AreaController extends Controller
         $stats = $this->areaService->getStats($area);
 
         return $this->success($stats);
-    }
-
-    /**
-     * Get alerts for all devices in the area.
-     */
-    public function alerts(Area $area, ListAlertsRequest $request): JsonResponse
-    {
-        $this->authorize("view", $area);
-
-        $alerts = $this->alertService->listForArea(
-            $area,
-            $request->validated(),
-            $request->user(),
-        );
-
-        return $this->collection(AlertResource::collection($alerts));
-    }
-
-    /**
-     * Get readings for all devices in the area.
-     */
-    public function getReadings(
-        Area $area,
-        ListReadingsRequest $request,
-    ): JsonResponse {
-        $this->authorize("viewArea", [DeviceReading::class, $area]);
-
-        $readings = $this->readingQueryService->getAreaReadings(
-            $area,
-            $request->validated(),
-            $request->user(),
-        );
-
-        return $this->collection(ReadingResource::collection($readings));
     }
 }

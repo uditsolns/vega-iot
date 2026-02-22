@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
+        DB::statement('CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;');
+
         DB::statement("
             SELECT create_hypertable(
                 'sensor_readings',

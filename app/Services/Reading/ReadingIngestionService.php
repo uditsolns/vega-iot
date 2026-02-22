@@ -85,7 +85,6 @@ class ReadingIngestionService
 
         return [
             'success'     => true,
-            'inserted'    => $insertedCount,
             'recorded_at' => $recordedAt->toIso8601String(),
         ];
     }

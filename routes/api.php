@@ -1,15 +1,11 @@
 <?php
 
-use App\Enums\DeviceStatus;
-use App\Enums\DeviceType;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\CalibrationInstrumentController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Device\DeviceBulkController;
 use App\Http\Controllers\Device\DeviceConfigurationController;
 use App\Http\Controllers\Device\DeviceController;
 use App\Http\Controllers\Device\DeviceModelController;
@@ -19,8 +15,6 @@ use App\Http\Controllers\Hierarchy\CompanyController;
 use App\Http\Controllers\Hierarchy\HierarchyController;
 use App\Http\Controllers\Hierarchy\HubController;
 use App\Http\Controllers\Hierarchy\LocationController;
-use App\Http\Controllers\IngestController;
-use App\Http\Controllers\ReadingController;
 use App\Http\Controllers\Report\AuditReportController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\Report\ScheduledReportController;
@@ -46,15 +40,6 @@ Route::prefix("v1")->group(function () {
         });
     });
 
-    // Device ingestion routes (device authentication via API key)
-    Route::middleware("auth.device")
-        ->prefix("ingest")
-        ->controller(IngestController::class)
-        ->group(function () {
-            Route::post("/", "store");
-            Route::post("batch", "batch");
-        });
-
     // Authenticated routes
     Route::middleware(["auth:sanctum", "prepare.user"])->group(function () {
         // Auth - Logout
@@ -75,19 +60,6 @@ Route::prefix("v1")->group(function () {
                 });
             });
 
-        // Dashboard
-        Route::prefix("dashboard")
-            ->controller(DashboardController::class)
-            ->group(function () {
-                Route::get("overview", "overview");
-                Route::get("device-status", "deviceStatus");
-                Route::get("active-alerts", "activeAlerts");
-                Route::get("recent-activity", "recentActivity");
-                Route::get("temperature-trends", "temperatureTrends");
-                Route::get("alert-trends", "alertTrends");
-                Route::get("top-devices-by-alerts", "topDevicesByAlerts");
-            });
-
         // Companies
         Route::apiResource("companies", CompanyController::class);
         Route::controller(CompanyController::class)->group(function () {
@@ -97,7 +69,6 @@ Route::prefix("v1")->group(function () {
         });
 
         // Users - Basic operations
-        Route::get("users/export", [UserController::class, "export"]);
         Route::apiResource("users", UserController::class);
         Route::controller(UserController::class)
             ->prefix("users")
@@ -106,12 +77,10 @@ Route::prefix("v1")->group(function () {
                 Route::patch("{user}/deactivate", "deactivate");
                 Route::patch("{user}/roles", "changeRole");
                 Route::post("{user}/reset-password", "resetPassword");
-                Route::post("{user}/resend-invite", "resendInvite");
-                Route::get("{user}/activity", "activity");
                 Route::patch("{id}/restore", "restore");
             });
 
-        // Users - Area management (STUB for Phase 2)
+        // Users - Area management
         Route::prefix("users/{user}/areas")
             ->controller(UserAreaController::class)
             ->group(function () {
@@ -166,7 +135,6 @@ Route::prefix("v1")->group(function () {
                 Route::get("{location}/hubs", "hubs");
                 Route::get("{location}/devices", "devices");
                 Route::get("{location}/stats", "stats");
-                Route::get("{location}/alerts", "alerts");
                 Route::patch("{id}/restore", "restore");
             });
 
@@ -194,8 +162,6 @@ Route::prefix("v1")->group(function () {
                 Route::post("{area}/copy-alert-config", "copyAlertConfig");
                 Route::get("{area}/devices", "devices");
                 Route::get("{area}/stats", "stats");
-                Route::get("{area}/alerts", "alerts");
-                Route::get("{area}/readings", "getReadings");
                 Route::patch("{id}/restore", "restore");
             });
 
@@ -261,24 +227,14 @@ Route::prefix("v1")->group(function () {
                 Route::get('{sensor}/configuration/history', 'configurationHistory');
             });
 
-        // Readings
-        Route::prefix("readings")
-            ->controller(ReadingController::class)
-            ->group(function () {
-                Route::get("/", "index");
-                Route::get("aggregations", "aggregations");
-            });
-
         // Alerts
         Route::prefix("alerts")
             ->controller(AlertController::class)
             ->group(function () {
                 Route::get("/", "index");
-                Route::get("statistics", "statistics");
                 Route::get("{alert}", "show");
                 Route::patch("{alert}/acknowledge", "acknowledge");
                 Route::patch("{alert}/resolve", "resolve");
-                Route::get("{alert}/notifications", "notifications");
             });
 
         // Tickets - Enhanced with lifecycle actions
@@ -304,8 +260,6 @@ Route::prefix("v1")->group(function () {
             ->controller(AuditLogController::class)
             ->group(function () {
                 Route::get("/", "index");
-                Route::get("users/{user}/activity", "userActivity");
-                Route::get("resource-history", "resourceHistory");
             });
 
         // Reports

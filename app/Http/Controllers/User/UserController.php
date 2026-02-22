@@ -139,37 +139,4 @@ class UserController extends Controller
             "TODO: Password reset email functionality will be implemented in notifications module",
         );
     }
-
-    public function resendInvite(Request $request, User $user): JsonResponse
-    {
-        $this->authorize("create", User::class);
-
-        // TODO: Implement in future module with notification system
-        return $this->success(
-            null,
-            "TODO: Invite email functionality will be implemented in notifications module",
-        );
-    }
-
-    public function activity(Request $request, User $user): JsonResponse
-    {
-        $this->authorize("view", $user);
-
-        // TODO: Implement in future module with audit/activity logging
-        return $this->success(
-            ["activities" => []],
-            "TODO: User activity tracking will be implemented in audit module",
-        );
-    }
-
-    public function export(Request $request): JsonResponse
-    {
-        $this->authorize("viewAny", User::class);
-
-        // TODO: Implement in future module with export functionality
-        return $this->success(
-            null,
-            "TODO: User export functionality will be implemented in reports module",
-        );
-    }
 }

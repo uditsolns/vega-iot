@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Hierarchy;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Alert\ListAlertsRequest;
 use App\Http\Requests\Location\CreateLocationRequest;
 use App\Http\Requests\Location\UpdateLocationRequest;
-use App\Http\Resources\AlertResource;
 use App\Http\Resources\DeviceResource;
 use App\Http\Resources\HubResource;
 use App\Http\Resources\LocationResource;
 use App\Models\Location;
-use App\Services\Alert\AlertService;
 use App\Services\Company\LocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +17,6 @@ class LocationController extends Controller
 {
     public function __construct(
         private readonly LocationService $locationService,
-        private readonly AlertService $alertService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -152,23 +148,5 @@ class LocationController extends Controller
         $stats = $this->locationService->getStats($location);
 
         return $this->success($stats);
-    }
-
-    /**
-     * Get alerts for all devices in the location.
-     */
-    public function alerts(
-        Location $location,
-        ListAlertsRequest $request,
-    ): JsonResponse {
-        $this->authorize("view", $location);
-
-        $alerts = $this->alertService->listForLocation(
-            $location,
-            $request->validated(),
-            $request->user(),
-        );
-
-        return $this->collection(AlertResource::collection($alerts));
     }
 }
