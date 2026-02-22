@@ -22,32 +22,16 @@ class AlertController extends Controller
     /**
      * Get paginated list of alerts with filters
      */
-    public function index(ListAlertsRequest $request): JsonResponse
+    public function index(): JsonResponse
     {
         $this->authorize("viewAny", Alert::class);
 
         $alerts = $this->alertService->list(
-            $request->validated(),
-            $request->user(),
+            request()->all(),
+            request()->user(),
         );
 
         return $this->collection(AlertResource::collection($alerts));
-    }
-
-    /**
-     * Get alert statistics
-     */
-    public function statistics(Request $request): JsonResponse
-    {
-        $this->authorize("viewAny", Alert::class);
-
-        $days = $request->integer("days", 7);
-        $statistics = $this->alertService->getStatistics(
-            $request->user(),
-            $days,
-        );
-
-        return $this->success($statistics, "Alert statistics retrieved");
     }
 
     /**
@@ -96,20 +80,5 @@ class AlertController extends Controller
         );
 
         return $this->success(new AlertResource($alert), "Alert resolved");
-    }
-
-    /**
-     * Get notifications for a specific alert
-     */
-    public function notifications(Alert $alert): JsonResponse
-    {
-        $this->authorize("view", $alert);
-
-        $notifications = $this->alertService->getNotifications($alert);
-
-        return $this->success(
-            AlertNotificationResource::collection($notifications),
-            "Alert notifications retrieved",
-        );
     }
 }

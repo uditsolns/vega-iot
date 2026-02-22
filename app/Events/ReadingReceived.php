@@ -12,43 +12,28 @@ class ReadingReceived implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    /**
-     * Store only IDs and primitive data, not the entire Device model
-     */
     public function __construct(
         public readonly int $deviceId,
         public readonly string $recordedAt,
-        public readonly array $readingData
+        public readonly array $sensorReadings // [['sensor_id' => 1, 'value' => 23.5], ...]
     ) {}
 
-    /**
-     * Get the channels the event should broadcast on.
-     */
     public function broadcastOn(): Channel
     {
         return new Channel("devices.{$this->deviceId}");
     }
 
-    /**
-     * The event's broadcast name.
-     */
     public function broadcastAs(): string
     {
         return 'reading.received';
     }
 
-    /**
-     * Get the data to broadcast.
-     */
     public function broadcastWith(): array
     {
         return [
-            'device_id' => $this->deviceId,
-            'recorded_at' => $this->recordedAt,
-            'temperature' => $this->readingData['temperature'] ?? null,
-            'humidity' => $this->readingData['humidity'] ?? null,
-            'temp_probe' => $this->readingData['temp_probe'] ?? null,
-            'battery_percentage' => $this->readingData['battery_percentage'] ?? null,
+            'device_id'       => $this->deviceId,
+            'recorded_at'     => $this->recordedAt,
+            'sensor_readings' => $this->sensorReadings,
         ];
     }
 }
