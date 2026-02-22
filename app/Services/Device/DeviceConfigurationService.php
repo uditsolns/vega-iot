@@ -4,127 +4,82 @@ namespace App\Services\Device;
 
 use App\Models\Device;
 use App\Models\DeviceConfiguration;
+use App\Models\DeviceConfigurationRequest;
 use App\Models\User;
-use App\Services\Audit\ActivityLogger;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Vendor\VendorAdapterFactory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 readonly class DeviceConfigurationService
 {
-
-    /**
-     * Get current configuration for a device
-     */
     public function getCurrent(Device $device): ?DeviceConfiguration
     {
         return $device->currentConfiguration;
     }
 
-    /**
-     * Get configuration history for a device
-     */
     public function getHistory(Device $device): Collection
     {
-        return $device->configurations()->latest()->get();
+        return $device->configurations()->with('updatedBy')->get();
     }
 
-    /**
-     * Create default configuration for a new device
-     */
     public function createDefault(Device $device): DeviceConfiguration
     {
         return DeviceConfiguration::create([
-            "device_id" => $device->id,
-            "is_current" => true,
-            // All other fields will use migration defaults
+            'device_id' => $device->id,
+            'recording_interval' => 5,
+            'sending_interval' => 5,
+            'effective_from' => now(),
         ]);
     }
 
-    /**
-     * Update device configuration with transaction
-     * Creates new config and marks old as not current
-     * @throws Throwable
-     */
-    public function update(
-        Device $device,
-        array $data,
-        User $user,
-    ): DeviceConfiguration {
+    public function update(Device $device, array $data, User $user): DeviceConfiguration
+    {
         return DB::transaction(function () use ($device, $data, $user) {
-            // Step 1: Set current config to is_current = false
-            DeviceConfiguration::where("device_id", $device->id)
-                ->where("is_current", true)
-                ->update(["is_current" => false]);
+            DeviceConfiguration::where('device_id', $device->id)
+                ->whereNull('effective_to')
+                ->update(['effective_to' => now()]);
 
-            // Step 2: Create new configuration with is_current = true
-            $newConfig = DeviceConfiguration::create([
-                ...$data,
-                "device_id" => $device->id,
-                "is_current" => true,
-                "updated_by" => $user->id,
+            $config = DeviceConfiguration::create([
+                ...\Arr::only($data, [
+                    'recording_interval',
+                    'sending_interval',
+                    'wifi_ssid',
+                    'wifi_password',
+                    'wifi_mode',
+                    'timezone_offset_minutes',
+                ]),
+                'device_id' => $device->id,
+                'effective_from' => now(),
+                'updated_by' => $user->id,
             ]);
 
-            activity("device")
-                ->event("configuration_updated")
-                ->withProperties(["device_id" => $device->id])
-                ->log("Updated configuration for device \"{$device->device_code}\"");
+            $this->createConfigRequest($device, $data, $user);
 
-            return $newConfig;
+            return $config->fresh();
         });
     }
 
-    /**
-     * Bulk update configurations for multiple devices
-     * @throws Throwable
-     */
-    public function bulkUpdate(
-        array $deviceIds,
-        array $configData,
-        User $user,
-    ): void {
-        // Step 1: Fetch all devices at once
-        $devices = Device::whereIn("id", $deviceIds)->get();
+    private function createConfigRequest(Device $device, array $data, User $user): ?DeviceConfigurationRequest
+    {
+        $device->loadMissing('deviceModel');
+        $adapter = VendorAdapterFactory::makeForDevice($device);
 
-        // Step 2: Authorize all devices
-        foreach ($devices as $device) {
-            if (!$user->can("configure", $device)) {
-                throw new AuthorizationException(
-                    "Unauthorized to configure device $device->device_code.",
-                );
-            }
+        try {
+            $vendorCommand = $adapter->buildConfigCommand($data);
+        } catch (\RuntimeException) {
+            return null;
         }
 
-        // perform bulk action within transaction
-        DB::transaction(function () use ($deviceIds, $configData, $user) {
-            // set all current configs to is_current = false
-            DeviceConfiguration::whereIn("device_id", $deviceIds)
-                ->current()
-                ->update(["is_current" => false]);
+        if (empty($vendorCommand)) {
+            return null;
+        }
 
-            // Create new configurations for all devices
-            $newConfigs = [];
-            foreach ($deviceIds as $deviceId) {
-                $newConfigs[] = [
-                    ...$configData,
-                    "device_id" => $deviceId,
-                    "is_current" => true,
-                    "updated_by" => $user->id,
-                    "created_at" => now(),
-                    "updated_at" => now(),
-                ];
-            }
-
-            DeviceConfiguration::insert($newConfigs);
-
-            activity("device")
-                ->event('bulk_configuration_updated')
-                ->withProperties([
-                    'device_ids' => $deviceIds,
-                    'device_count' => count($deviceIds)
-                ])
-                ->log("Bulk updated configuration for " . count($deviceIds) . " devices");
-        });
+        return DeviceConfigurationRequest::create([
+            'device_id' => $device->id,
+            'requested_config' => $data,
+            'vendor_command' => $vendorCommand,
+            'status' => \App\Enums\ConfigRequestStatus::Pending,
+            'requested_by' => $user->id,
+        ]);
     }
 }

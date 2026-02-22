@@ -9,303 +9,108 @@ use App\Http\Requests\Device\AssignDeviceToCompanyRequest;
 use App\Http\Requests\Device\ChangeStatusRequest;
 use App\Http\Requests\Device\CreateDeviceRequest;
 use App\Http\Requests\Device\UpdateDeviceRequest;
-use App\Http\Requests\Reading\ListReadingsRequest;
 use App\Http\Resources\DeviceResource;
-use App\Http\Resources\ReadingResource;
 use App\Models\Device;
-use App\Models\DeviceReading;
-use App\Services\Device\DeviceInventoryService;
 use App\Services\Device\DeviceService;
-use App\Services\Reading\ReadingQueryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DeviceController extends Controller
 {
-    public function __construct(
-        private readonly DeviceService $deviceService,
-        private readonly ReadingQueryService $readingQueryService,
-    ) {}
+    public function __construct(private readonly DeviceService $deviceService) {}
 
-    /**
-     * Display a listing of devices.
-     */
     public function index(Request $request): JsonResponse
     {
-        $this->authorize("viewAny", Device::class);
-
-        $devices = $this->deviceService->list(
-            $request->all(),
-            $request->user(),
-        );
-
+        $this->authorize('viewAny', Device::class);
+        $devices = $this->deviceService->list($request->all(), $request->user());
         return $this->collection(DeviceResource::collection($devices));
     }
 
-    /**
-     * Store a newly created device.
-     */
     public function store(CreateDeviceRequest $request): JsonResponse
     {
-        $this->authorize("create", Device::class);
-
-        $device = $this->deviceService->create($request->validated());
-
-        return $this->created(
-            new DeviceResource($device),
-            "Device created successfully",
-        );
+        $this->authorize('create', Device::class);
+        $device = $this->deviceService->create($request->validated(), $request->user());
+        return $this->created(new DeviceResource($device), 'Device created successfully');
     }
 
-    /**
-     * Display the specified device.
-     */
     public function show(Device $device): JsonResponse
     {
-        $this->authorize("view", $device);
-
-        $device->load(["company", "area.hub.location", "currentConfiguration"]);
-
+        $this->authorize('view', $device);
+        $device->load(['deviceModel', 'company', 'area.hub.location', 'sensors.sensorType', 'sensors.currentConfiguration', 'currentConfiguration']);
         return $this->success(new DeviceResource($device));
     }
 
-    /**
-     * Update the specified device.
-     */
-    public function update(
-        UpdateDeviceRequest $request,
-        Device $device,
-    ): JsonResponse {
-        $this->authorize("update", $device);
-
+    public function update(UpdateDeviceRequest $request, Device $device): JsonResponse
+    {
+        $this->authorize('update', $device);
         $device = $this->deviceService->update($device, $request->validated());
-
-        return $this->success(
-            new DeviceResource($device),
-            "Device updated successfully",
-        );
+        return $this->success(new DeviceResource($device), 'Device updated successfully');
     }
 
-    /**
-     * Remove the specified device.
-     */
     public function destroy(Device $device): JsonResponse
     {
-        $this->authorize("delete", $device);
-
+        $this->authorize('delete', $device);
         $this->deviceService->delete($device);
-
-        return $this->success(null, "Device deleted successfully");
+        return $this->success(null, 'Device deleted successfully');
     }
 
-    /**
-     * Activate a device.
-     */
-    public function activate(Device $device): JsonResponse
+    public function changeStatus(ChangeStatusRequest $request, Device $device): JsonResponse
     {
-        $this->authorize("update", $device);
-
-        $device = $this->deviceService->update($device, ["is_active" => true]);
-
-        return $this->success(
-            new DeviceResource($device),
-            "Device activated successfully",
-        );
+        $this->authorize('update', $device);
+        $device = $this->deviceService->changeStatus($device, $request->validated()['status']);
+        return $this->success(new DeviceResource($device), 'Device status updated successfully');
     }
 
-    /**
-     * Deactivate a device.
-     */
-    public function deactivate(Device $device): JsonResponse
+    public function assignToCompany(AssignDeviceToCompanyRequest $request, Device $device): JsonResponse
     {
-        $this->authorize("update", $device);
-
-        $device = $this->deviceService->update($device, ["is_active" => false]);
-
-        return $this->success(
-            new DeviceResource($device),
-            "Device deactivated successfully",
-        );
+        $this->authorize('assignToCompany', $device);
+        $device = $this->deviceService->assignToCompany($device, $request->validated());
+        return $this->success(new DeviceResource($device), 'Device assigned to company successfully');
     }
 
-    /**
-     * Restore is not applicable (no soft deletes).
-     */
-    public function restore(int $id): JsonResponse
+    public function assignToArea(AssignDeviceToAreaRequest $request, Device $device): JsonResponse
     {
-        return $this->error("Device restoration not supported", 404);
-    }
-
-    /**
-     * Change device status.
-     */
-    public function changeStatus(
-        ChangeStatusRequest $request,
-        Device $device,
-    ): JsonResponse {
-        $this->authorize("update", $device);
-
-        $device = $this->deviceService->changeStatus(
-            $device,
-            $request->validated()["status"],
-        );
-
-        return $this->success(
-            new DeviceResource($device),
-            "Device status updated successfully",
-        );
-    }
-
-    /**
-     * Assign device to company.
-     */
-    public function assignToCompany(
-        AssignDeviceToCompanyRequest $request,
-        Device $device,
-    ): JsonResponse {
-        $this->authorize("assignToCompany", $device);
-
-        $device = $this->deviceService->assignToCompany(
-            $device,
-            $request->validated(),
-        );
-
-        return $this->success(
-            new DeviceResource($device),
-            "Device assigned to company successfully",
-        );
-    }
-
-    /**
-     * Assign device to area.
-     * @throws DeviceAssignmentException
-     */
-    public function assignToArea(
-        AssignDeviceToAreaRequest $request,
-        Device $device,
-    ): JsonResponse {
         $validated = $request->validated();
-        $this->authorize("assignToArea", [$device, $validated["area_id"]]);
+        $this->authorize('assignToArea', [$device, $validated['area_id']]);
 
-        $device = $this->deviceService->assignToArea($device, $validated);
+        try {
+            $device = $this->deviceService->assignToArea($device, $validated);
+        } catch (DeviceAssignmentException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
 
-        return $this->success(
-            new DeviceResource($device),
-            "Device assigned to area successfully",
-        );
+        return $this->success(new DeviceResource($device), 'Device assigned to area successfully');
     }
 
-    /**
-     * Unassign device (return to system inventory).
-     */
     public function unassign(Device $device): JsonResponse
     {
-        $this->authorize("assign-to-company", $device);
-
+        $this->authorize('assignToCompany', $device);
         $device = $this->deviceService->unassign($device);
-
-        return $this->success(
-            new DeviceResource($device),
-            "Device unassigned successfully",
-        );
+        return $this->success(new DeviceResource($device), 'Device unassigned successfully');
     }
 
-    /**
-     * Regenerate device API key.
-     */
-    public function regenerateApiKey(Device $device): JsonResponse
+    public function activate(Device $device): JsonResponse
     {
-        $this->authorize("regenerateApiKey", $device);
-
-        $result = $this->deviceService->regenerateApiKey($device);
-
-        return $this->success($result, "API key regenerated successfully");
+        $this->authorize('update', $device);
+        $device = $this->deviceService->update($device, ['is_active' => true]);
+        return $this->success(new DeviceResource($device), 'Device activated successfully');
     }
 
-    /**
-     * Get readings for a specific device.
-     */
-    public function getReadings(
-        ListReadingsRequest $request,
-        Device $device,
-    ): JsonResponse {
-        $this->authorize("viewDevice", [DeviceReading::class, $device]);
-
-        $readings = $this->readingQueryService->getDeviceReadings(
-            $device,
-            $request->validated(),
-            $request->user(),
-        );
-
-        return $this->collection(ReadingResource::collection($readings));
-    }
-
-    /**
-     * Get the latest reading for a device.
-     */
-    public function getLatestReading(Device $device): JsonResponse
+    public function deactivate(Device $device): JsonResponse
     {
-        $this->authorize("viewDevice", [DeviceReading::class, $device]);
-
-        $reading = $this->readingQueryService->getLatestReading(
-            $device,
-            request()->user(),
-        );
-
-        if (!$reading) {
-            return $this->success(null, "No readings found for this device");
-        }
-
-        return $this->success(new ReadingResource($reading));
+        $this->authorize('update', $device);
+        $device = $this->deviceService->update($device, ['is_active' => false]);
+        return $this->success(new DeviceResource($device), 'Device deactivated successfully');
     }
 
-    /**
-     * Get the latest reading for a device.
-     */
-    public function getReadingsAvailableDates(Device $device): JsonResponse
-    {
-        $this->authorize("viewDevice", [DeviceReading::class, $device]);
-
-        $dates = $this->readingQueryService->getReadingsAvailableDates(
-            $device,
-            request()->user(),
-        );
-
-        if (!$dates) {
-            return $this->success(null, "No readings found for this device");
-        }
-
-        return $this->success($dates);
-    }
-
-    /**
-     * Get device alerts (stub for Phase 5).
-     */
-    public function getAlerts(Device $device): JsonResponse
-    {
-        $this->authorize("view", $device);
-
-        return $this->success([], "TODO: Phase 5 - Device alerts endpoint");
-    }
-
-    /**
-     * Get device statistics.
-     */
     public function getStats(Request $request): JsonResponse
     {
-        $this->authorize("viewAny", Device::class);
+        $this->authorize('viewAny', Device::class);
 
-        $user = $request->user();
-
-        if (!$user->company_id) {
-            return $this->error(
-                "Statistics only available for company users",
-                403,
-            );
+        if (!$request->user()->company_id) {
+            return $this->error('Statistics only available for company users', 403);
         }
 
-        $stats = $this->deviceService->getDeviceStats($user->company_id);
-
-        return $this->success($stats);
+        return $this->success($this->deviceService->getStats($request->user()->company_id));
     }
 }

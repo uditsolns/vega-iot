@@ -150,19 +150,6 @@ class DevicePolicy
     }
 
     /**
-     * Determine if the user can regenerate device API key.
-     * Only super admins can regenerate API keys.
-     */
-    public function regenerateApiKey(User $user, Device $device): bool
-    {
-        if (!$user->hasPermission("devices.update")) {
-            return false;
-        }
-
-        return $user->isSuperAdmin();
-    }
-
-    /**
      * Helper method to check if user can access a device.
      */
     private function userCanAccessDevice(User $user, Device $device): bool

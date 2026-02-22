@@ -6,43 +6,37 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class DeviceConfiguration extends Model
+class SensorConfiguration extends Model
 {
     public $timestamps = false;
 
     protected $fillable = [
-        'device_id',
-        'recording_interval',
-        'sending_interval',
-        'wifi_ssid',
-        'wifi_password',
-        'wifi_mode',
-        'timezone_offset_minutes',
+        'device_sensor_id',
+        'min_critical',
+        'max_critical',
+        'min_warning',
+        'max_warning',
         'effective_from',
         'effective_to',
-        'last_synced_at',
         'updated_by',
     ];
-
-    protected $hidden = ['wifi_password'];
 
     protected function casts(): array
     {
         return [
-            'recording_interval' => 'integer',
-            'sending_interval' => 'integer',
-            'timezone_offset_minutes' => 'integer',
-            'wifi_password' => 'encrypted',
+            'min_critical' => 'decimal:2',
+            'max_critical' => 'decimal:2',
+            'min_warning' => 'decimal:2',
+            'max_warning' => 'decimal:2',
             'effective_from' => 'datetime',
             'effective_to' => 'datetime',
-            'last_synced_at' => 'datetime',
             'created_at' => 'datetime',
         ];
     }
 
-    public function device(): BelongsTo
+    public function deviceSensor(): BelongsTo
     {
-        return $this->belongsTo(Device::class);
+        return $this->belongsTo(DeviceSensor::class);
     }
 
     public function updatedBy(): BelongsTo

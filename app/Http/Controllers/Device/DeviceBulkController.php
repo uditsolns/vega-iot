@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Device;
 
 use App\Exceptions\DeviceAssignmentException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Device\BulkAssignDevicesToAreaRequest;
-use App\Http\Requests\Device\BulkAssignDevicesToCompanyRequest;
-use App\Http\Requests\Device\BulkChangeStatusRequest;
-use App\Http\Requests\Device\BulkConfigureDevicesRequest;
-use App\Http\Requests\Device\BulkDeviceRequest;
+use App\Http\Requests\Device\Bulk\BulkAssignDevicesToAreaRequest;
+use App\Http\Requests\Device\Bulk\BulkAssignDevicesToCompanyRequest;
+use App\Http\Requests\Device\Bulk\BulkChangeStatusRequest;
+use App\Http\Requests\Device\Bulk\BulkConfigureDevicesRequest;
+use App\Http\Requests\Device\Bulk\BulkDeviceRequest;
 use App\Models\Device;
 use App\Services\Device\DeviceConfigurationService;
 use App\Services\Device\DeviceService;

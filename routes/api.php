@@ -12,6 +12,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Device\DeviceBulkController;
 use App\Http\Controllers\Device\DeviceConfigurationController;
 use App\Http\Controllers\Device\DeviceController;
+use App\Http\Controllers\Device\DeviceModelController;
+use App\Http\Controllers\Device\DeviceSensorController;
 use App\Http\Controllers\Hierarchy\AreaController;
 use App\Http\Controllers\Hierarchy\CompanyController;
 use App\Http\Controllers\Hierarchy\HierarchyController;
@@ -29,6 +31,7 @@ use App\Http\Controllers\User\UserAreaController;
 use App\Http\Controllers\User\UserController;
 use App\Http\Controllers\User\UserPermissionController;
 use App\Http\Controllers\ValidationStudyController;
+use App\Models\SensorType;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix("v1")->group(function () {
@@ -196,29 +199,30 @@ Route::prefix("v1")->group(function () {
                 Route::patch("{id}/restore", "restore");
             });
 
-        // Devices - Helper endpoints
-        Route::get(
-            "devices/types",
-            fn() => response()->json([
-                "data" => [
-                    "types" => DeviceType::labels(),
-                    "statuses" => DeviceStatus::labels(),
-                ],
-            ]),
-        );
-        Route::get("devices/stats", [DeviceController::class, "getStats"]);
 
-        // Devices - Bulk operations
-        Route::prefix("devices/bulk")
-            ->controller(DeviceBulkController::class)
+        // Device Models (Super Admin only)
+        Route::prefix('device-models')
+            ->controller(DeviceModelController::class)
             ->group(function () {
-                Route::post("assign-company", "bulkAssignToCompany");
-                Route::post("assign-area", "bulkAssignToArea");
-                Route::post("unassign", "bulkUnassign");
-                Route::post("configure", "bulkConfigure");
-                Route::post("status", "bulkChangeStatus");
-                Route::post("delete", "bulkDelete");
+                Route::get('/', 'index');
+                Route::post('/', 'store');
+                Route::get('{deviceModel}', 'show');
+                Route::delete('{deviceModel}', 'destroy');
             });
+
+        // Sensor Types (read-only for all authenticated users)
+        Route::get('sensor-types', fn() => response()->json([
+            'data' => SensorType::all()->map(fn($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'unit' => $t->unit,
+                'data_type' => $t->data_type->value,
+                'supports_threshold_config' => $t->supports_threshold_config,
+            ])
+        ]));
+
+        // Devices
+        Route::get('devices/stats', [DeviceController::class, 'getStats']);
 
         // Devices - CRUD
         Route::apiResource("devices", DeviceController::class);
@@ -233,23 +237,28 @@ Route::prefix("v1")->group(function () {
                 Route::post("{device}/assign-company", "assignToCompany");
                 Route::post("{device}/assign-area", "assignToArea");
                 Route::post("{device}/unassign", "unassign");
-                Route::post("{device}/regenerate-api-key", "regenerateApiKey");
-                Route::get("{device}/readings", "getReadings");
-                Route::get("{device}/readings/latest", "getLatestReading");
-                Route::get("{device}/alerts", "getAlerts");
-                Route::patch("{id}/restore", "restore");
-
-                Route::get("{device}/readings/available-dates", "getReadingsAvailableDates");
             });
 
-        // Devices - Configuration (nested resource)
-        Route::prefix("devices/{device}/configuration")
+        // Device Configuration
+        Route::prefix('devices/{device}/configuration')
             ->controller(DeviceConfigurationController::class)
             ->scopeBindings()
             ->group(function () {
-                Route::get("/", "show");
-                Route::put("/", "update");
-                Route::get("history", "history");
+                Route::get('/', 'show');
+                Route::put('/', 'update');
+                Route::get('history', 'history');
+            });
+
+        // Device Sensors
+        Route::prefix('devices/{device}/sensors')
+            ->controller(DeviceSensorController::class)
+            ->scopeBindings()
+            ->group(function () {
+                Route::get('/', 'index');
+                Route::patch('{sensor}', 'update');
+                Route::get('{sensor}/configuration', 'showConfiguration');
+                Route::put('{sensor}/configuration', 'updateConfiguration');
+                Route::get('{sensor}/configuration/history', 'configurationHistory');
             });
 
         // Readings
