@@ -4,314 +4,308 @@ namespace App\Services\Report;
 
 use App\Contracts\ReportableInterface;
 use App\DTOs\ReportGenerationDTO;
-use App\Enums\ReportDataFormation;
 use App\Enums\ReportFileType;
 use App\Models\Device;
-use App\Models\DeviceReading;
+use App\Models\DeviceSensor;
 use App\Services\Report\PDF\PdfGeneratorService;
-use Carbon\Carbon;
-use Exception;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 
 readonly class ReportGeneratorService
 {
     public function __construct(
-        private PdfGeneratorService $pdfGenerator
+        private PdfGeneratorService $pdfGenerator,
+        private ReportQueryService  $queryService,
     ) {}
 
-    /**
-     * Generate report from a Reportable entity
-     */
+    // ─── Public Entry Points ─────────────────────────────────────────────────
+
     public function generateFromReportable(ReportableInterface $reportable): string
     {
-        $dto = ReportGenerationDTO::fromReportable($reportable);
-        return $this->generate($dto);
+        return $this->generate(ReportGenerationDTO::fromReportable($reportable));
     }
 
-    /**
-     * Generate report from a DTO
-     */
     public function generate(ReportGenerationDTO $dto): string
     {
+        // 1. Load device with eager-loaded sensor metadata
         $device = Device::with([
             'company',
             'area.hub.location',
-            'currentConfiguration'
+            'currentConfiguration',
         ])->findOrFail($dto->deviceId);
 
-        $readingsData = $this->fetchReadingsData($dto, $device);
+        // 2. Load the specific DeviceSensor models selected for the report
+        //    (ordered by slot_number for consistent column ordering)
+        $sensors = DeviceSensor::with(['sensorType', 'currentConfiguration'])
+            ->whereIn('id', $dto->sensorIds)
+            ->where('device_id', $dto->deviceId)
+            ->orderBy('slot_number')
+            ->get();
 
+        if ($sensors->isEmpty()) {
+            throw new \RuntimeException('No valid sensors found for the report.');
+        }
+
+        // Use the ordered sensor IDs (matching slot order, not request order)
+        $orderedSensorIds = $sensors->pluck('id')->toArray();
+
+        // 3. Run both DB queries in parallel conceptually (sequential in PHP,
+        //    but each is a single optimized TimescaleDB pass)
+        $bucketedRows = $this->queryService->getBucketedReadings($dto, $orderedSensorIds);
+        $statsMap     = $this->queryService->getSensorStatistics($dto, $orderedSensorIds);
+
+        // 4. Build the structured data payload for the PDF renderer
+        $reportData = $this->buildReportData($dto, $device, $sensors, $bucketedRows, $statsMap);
+
+        // 5. Render
         return match ($dto->fileType) {
-            ReportFileType::Pdf => $this->generatePdf($dto, $readingsData),
-            ReportFileType::Csv => $this->generateCsv($dto, $readingsData),
+            ReportFileType::Pdf => $this->pdfGenerator->generate($dto, $reportData),
+            ReportFileType::Csv => $this->generateCsv($dto, $reportData),
         };
     }
 
+    // ─── Data Assembly ────────────────────────────────────────────────────────
+
     /**
-     * Generate PDF report
+     * Assembles the full data structure passed to the Blade PDF templates.
      */
-    private function generatePdf(
+    private function buildReportData(
         ReportGenerationDTO $dto,
-        array $readingsData
-    ): string {
-        return $this->pdfGenerator->generate(
-            reportDto: $dto,
-            readingsData: $readingsData
-        );
-    }
+        Device              $device,
+        Collection          $sensors,
+        Collection          $bucketedRows,
+        Collection          $statsMap,
+    ): array {
+        $sensorMeta = $this->buildSensorMeta($sensors, $statsMap);
 
-    /**
-     * Generate CSV report
-     * @throws Exception
-     */
-    private function generateCsv(
-        ReportGenerationDTO $dto,
-        array $readingsData
-    ): string {
-        throw new Exception('CSV generation not yet implemented');
-    }
+        return [
+            'report_name'  => $dto->reportName,
+            'user_name'    => auth()->user()?->name ?? 'System',
+            'start_dt'     => $dto->fromDatetime->format('d-m-Y H:i:s'),
+            'end_dt'       => $dto->toDatetime->format('d-m-Y H:i:s'),
+            'interval'     => $dto->interval,
 
-    /**
-     * Fetch readings data - OPTIMIZED with TimescaleDB
-     */
-    private function fetchReadingsData(ReportGenerationDTO $dto, Device $device): array
-    {
-        // Use time_bucket for aggregation if interval-based sampling needed
-        $intervalMinutes = $dto->interval;
-
-        // For large datasets, use TimescaleDB time_bucket aggregation
-        if ($this->shouldUseAggregation($dto)) {
-            $readings = $this->fetchAggregatedReadings($dto, $device, $intervalMinutes);
-        } else {
-            // Direct query for smaller datasets
-            $readings = DeviceReading::where('device_id', $device->id)
-                ->whereBetween('recorded_at', [
-                    $dto->fromDatetime,
-                    $dto->toDatetime
-                ])
-                ->orderBy('recorded_at')
-                ->get();
-        }
-
-        return $this->formatReadingsData($readings, $device, $dto);
-    }
-
-    /**
-     * Check if aggregation should be used based on data volume
-     */
-    private function shouldUseAggregation(ReportGenerationDTO $dto): bool
-    {
-        $hours = $dto->fromDatetime->diffInHours($dto->toDatetime);
-        $estimatedRecords = ($hours * 60) / 5; // Assuming 5-min default interval
-
-        return $estimatedRecords > 10000; // Aggregate if > 10k records
-    }
-
-    /**
-     * Fetch aggregated readings using TimescaleDB time_bucket
-     */
-    private function fetchAggregatedReadings(ReportGenerationDTO $dto, Device $device, int $intervalMinutes)
-    {
-        $bucketInterval = max($intervalMinutes, 15); // Minimum 15-min buckets
-
-        return DB::table('device_readings')
-            ->select([
-                DB::raw("time_bucket('{$bucketInterval} minutes', recorded_at) as timestamp"),
-                DB::raw('AVG(temperature) as temperature'),
-                DB::raw('AVG(humidity) as humidity'),
-                DB::raw('AVG(temp_probe) as temp_probe'),
-            ])
-            ->where('device_id', $device->id)
-            ->whereBetween('recorded_at', [
-                $dto->fromDatetime,
-                $dto->toDatetime
-            ])
-            ->groupBy(DB::raw('1'))
-            ->orderBy('timestamp')
-            ->get()
-            ->map(function ($row) {
-                return (object) [
-                    'recorded_at' => Carbon::parse($row->timestamp),
-                    'temperature' => $row->temperature ? round($row->temperature, 2) : null,
-                    'humidity' => $row->humidity ? round($row->humidity, 2) : null,
-                    'temp_probe' => $row->temp_probe ? round($row->temp_probe, 2) : null,
-                ];
-            });
-    }
-
-    /**
-     * Format readings data
-     */
-    private function formatReadingsData($readings, Device $device, ReportGenerationDTO $dto): array
-    {
-        $formattedData = [
-            'logs' => [],
-            'device_info' => $this->getDeviceInfo($device),
-            'report_info' => $this->getReportInfo($dto, $device),
+            'device'       => $this->buildDeviceInfo($device),
+            'logger'       => $this->buildLoggerInfo($device, $dto),
+            'sensors'      => $sensorMeta,
+            'statistics'   => $this->buildStatistics($sensorMeta, $statsMap, $bucketedRows),
+            'logs'         => $this->buildLogs($bucketedRows, $sensors),
         ];
+    }
 
-        foreach ($readings as $reading) {
-            $log = [
-                'timestamp' => $reading->recorded_at->format('d-m-Y H:i:s'),
+    /**
+     * Per-sensor metadata: label, unit, thresholds, accuracy/resolution.
+     * Used by templates for column headers, chart axis labels, and threshold lines.
+     */
+    private function buildSensorMeta(Collection $sensors, Collection $statsMap): array
+    {
+        return $sensors->map(function (DeviceSensor $sensor) use ($statsMap) {
+            $config = $sensor->currentConfiguration;
+            $type   = $sensor->sensorType;
+
+            return [
+                'device_sensor_id' => $sensor->id,
+                'key'              => "sensor_{$sensor->id}",   // column key in log rows
+                'slot_number'      => $sensor->slot_number,
+                'label'            => $sensor->label ?? $type->name,
+                'unit'             => $type->unit,
+                'data_type'        => $type->data_type->value,
+                'supports_threshold' => $type->supports_threshold_config,
+                'accuracy'         => $sensor->accuracy,
+                'resolution'       => $sensor->resolution,
+
+                // Thresholds from current SensorConfiguration
+                'min_critical'     => $config?->min_critical,
+                'max_critical'     => $config?->max_critical,
+                'min_warning'      => $config?->min_warning,
+                'max_warning'      => $config?->max_warning,
             ];
+        })->values()->toArray();
+    }
 
-            switch ($dto->dataFormation) {
-                case ReportDataFormation::SingleTemperature:
-                    $log['temperature'] = $reading->temperature;
-                    break;
+    /**
+     * Log rows: one entry per time_bucket interval.
+     * Format: ['timestamp' => '...', 'sensor_12' => 4.2, 'sensor_13' => 65.1, ...]
+     */
+    private function buildLogs(Collection $bucketedRows, Collection $sensors): array
+    {
+        return $bucketedRows->map(function ($row) use ($sensors) {
+            $log = ['timestamp' => $row->bucket->format('d-m-Y H:i:s')];
 
-                case ReportDataFormation::SeparateTemperatureHumidity:
-                case ReportDataFormation::CombinedTemperatureHumidity:
-                    $log['temperature'] = $reading->temperature;
-                    $log['humidity'] = $reading->humidity;
-                    break;
-
-                case ReportDataFormation::CombinedProbeTemperature:
-                    $log['temperature'] = $reading->temperature;
-                    $log['tempprobe'] = $reading->temp_probe;
-                    break;
-
-                case ReportDataFormation::CombinedProbeTemperatureHumidity:
-                    $log['temperature'] = $reading->temperature;
-                    $log['tempprobe'] = $reading->temp_probe;
-                    $log['humidity'] = $reading->humidity;
-                    break;
+            foreach ($sensors as $sensor) {
+                $key        = "sensor_{$sensor->id}";
+                $raw        = $row->{$key} ?? null;
+                $log[$key]  = $raw !== null ? round((float) $raw, 2) : null;
             }
 
-            $formattedData['logs'][] = $log;
-        }
-
-        $formattedData['statistics'] = $this->calculateStatistics($readings, $dto->dataFormation);
-
-        return $formattedData;
+            return $log;
+        })->toArray();
     }
 
     /**
-     * Get device information
+     * Per-sensor statistics computed from stats_agg() results,
+     * plus MKT (computed in PHP from bucketed averages).
      */
-    private function getDeviceInfo(Device $device): array
-    {
-        return [
-            'make' => $device->make,
-            'model' => $device->model,
-            'serialno' => $device->device_uid,
-            'device_name' => $device->device_name ?? $device->device_code,
-            'device_code' => $device->device_code,
-            'instrumentid' => $device->id,
-            'temp_res' => $device->temp_resolution,
-            'temp_acc' => $device->temp_accuracy,
-            'hum_res' => $device->humidity_resolution,
-            'hum_acc' => $device->humidity_accuracy,
-            'tempprobe_res' => $device->temp_probe_resolution,
-            'tempprobe_acc' => $device->temp_probe_accuracy,
-        ];
-    }
-
-    /**
-     * Get report configuration
-     */
-    private function getReportInfo(ReportGenerationDTO $dto, Device $device): array
-    {
-        $config = $device->currentConfiguration;
-
-        return [
-            'report_name' => $dto->reportName,
-            'start_dt' => $dto->fromDatetime->format('d-m-Y H:i:s'),
-            'end_dt' => $dto->toDatetime->format('d-m-Y H:i:s'),
-            'data_formation' => $dto->dataFormation->value,
-            'record_interval' => $config->record_interval ?? 5,
-            'sending_interval' => $config->send_interval ?? 15,
-            'min_temp' => $config->temp_min_critical ?? 20,
-            'max_temp' => $config->temp_max_critical ?? 50,
-            'min_warn_temp' => $config->temp_min_warning ?? 25,
-            'max_warn_temp' => $config->temp_max_warning ?? 45,
-            'min_hum' => $config->humidity_min_critical ?? 40,
-            'max_hum' => $config->humidity_max_critical ?? 90,
-            'min_warn_hum' => $config->humidity_min_warning ?? 50,
-            'max_warn_hum' => $config->humidity_max_warning ?? 80,
-            'min_tempprobe' => $config->temp_probe_min_critical,
-            'max_tempprobe' => $config->temp_probe_max_critical,
-            'min_warn_tempProbe' => $config->temp_probe_min_warning,
-            'max_Warn_tempProbe' => $config->temp_probe_max_warning,
-        ];
-    }
-
-    /**
-     * Calculate statistics
-     */
-    private function calculateStatistics($readings, ReportDataFormation $dataFormation): array
+    private function buildStatistics(array $sensorMeta, Collection $statsMap, Collection $bucketedRows): array
     {
         $stats = [];
 
-        if ($readings->isEmpty()) {
-            return $stats;
-        }
+        foreach ($sensorMeta as $meta) {
+            $sensorId = $meta['device_sensor_id'];
+            $key      = $meta['key'];
+            $dbStats  = $statsMap->get($sensorId);
 
-        // Temperature statistics
-        if (in_array($dataFormation, [
-            ReportDataFormation::SingleTemperature,
-            ReportDataFormation::CombinedTemperatureHumidity,
-            ReportDataFormation::SeparateTemperatureHumidity,
-            ReportDataFormation::CombinedProbeTemperature,
-            ReportDataFormation::CombinedProbeTemperatureHumidity,
-        ])) {
-            $temps = $readings->pluck('temperature')->filter();
-            $stats['minTempData'] = $temps->min();
-            $stats['maxTempData'] = $temps->max();
-            $stats['avgTemp'] = round($temps->avg(), 2);
-            $stats['mkt'] = $this->calculateMKT($temps->toArray());
-        }
+            if (!$dbStats) {
+                continue;
+            }
 
-        // Humidity statistics
-        if (in_array($dataFormation, [
-            ReportDataFormation::CombinedTemperatureHumidity,
-            ReportDataFormation::SeparateTemperatureHumidity,
-            ReportDataFormation::CombinedProbeTemperatureHumidity,
-        ])) {
-            $humidity = $readings->pluck('humidity')->filter();
-            $stats['minHumData'] = $humidity->min();
-            $stats['maxHumData'] = $humidity->max();
-            $stats['avgHum'] = round($humidity->avg(), 2);
-        }
+            $sensorStats = [
+                'key'        => $key,
+                'label'      => $meta['label'],
+                'unit'       => $meta['unit'],
+                'min'        => $dbStats->min_val !== null ? round((float) $dbStats->min_val, 2) : null,
+                'max'        => $dbStats->max_val !== null ? round((float) $dbStats->max_val, 2) : null,
+                'avg'        => $dbStats->avg_val !== null ? round((float) $dbStats->avg_val, 2) : null,
+                'stddev'     => $dbStats->stddev_val !== null ? round((float) $dbStats->stddev_val, 3) : null,
+                'count'      => (int) ($dbStats->count_val ?? 0),
+                'first_val'  => $dbStats->first_val !== null ? round((float) $dbStats->first_val, 2) : null,
+                'last_val'   => $dbStats->last_val !== null ? round((float) $dbStats->last_val, 2) : null,
+            ];
 
-        // Temp Probe statistics
-        if (in_array($dataFormation, [
-            ReportDataFormation::CombinedProbeTemperature,
-            ReportDataFormation::CombinedProbeTemperatureHumidity,
-        ])) {
-            $tempProbe = $readings->pluck('temp_probe')->filter();
-            $stats['minTempProbeData'] = $tempProbe->min();
-            $stats['maxTempProbeData'] = $tempProbe->max();
-            $stats['avgTempProbe'] = round($tempProbe->avg(), 2);
+            // MKT only makes sense for temperature sensors (°C, °F, K)
+            if (in_array(strtolower($meta['unit']), ['°c', 'c', 'celsius'])) {
+                $bucketedValues = $bucketedRows
+                    ->pluck($key)
+                    ->filter(fn($v) => $v !== null)
+                    ->map(fn($v) => (float) $v)
+                    ->toArray();
+
+                $sensorStats['mkt'] = $this->calculateMkt($bucketedValues);
+            }
+
+            $stats[] = $sensorStats;
         }
 
         return $stats;
     }
 
-    /**
-     * Calculate Mean Kinetic Temperature (MKT)
-     * Formula: MKT = (ΔH/R) / ln[(e^(ΔH/RT1) + e^(ΔH/RT2) + ... + e^(ΔH/RTn)) / n]
-     */
-    private function calculateMKT(array $temperatures): float
+    // ─── Device / Logger Info ─────────────────────────────────────────────────
+
+    private function buildDeviceInfo(Device $device): array
     {
-        if (empty($temperatures)) {
-            return 0;
+        $model = $device->deviceModel ?? null;
+
+        return [
+            'id'           => $device->id,
+            'device_code'  => $device->device_code,
+            'device_name'  => $device->device_name ?? $device->device_code,
+            'device_uid'   => $device->device_uid,
+            'make'         => $model?->vendor?->label() ?? 'N/A',
+            'model'        => $model?->model_name ?? 'N/A',
+            'firmware'     => $device->firmware_version ?? 'N/A',
+            'location'     => $device->getLocationPath(),
+        ];
+    }
+
+    private function buildLoggerInfo(Device $device, ReportGenerationDTO $dto): array
+    {
+        $config = $device->currentConfiguration;
+
+        return [
+            'recording_interval' => $config?->recording_interval ?? 5,
+            'sending_interval'   => $config?->sending_interval ?? 15,
+            'interval'           => $dto->interval,
+            'start_dt'           => $dto->fromDatetime->format('d-m-Y H:i:s'),
+            'end_dt'             => $dto->toDatetime->format('d-m-Y H:i:s'),
+        ];
+    }
+
+    // ─── CSV ──────────────────────────────────────────────────────────────────
+
+    private function generateCsv(ReportGenerationDTO $dto, array $reportData): string
+    {
+        $sensors = $reportData['sensors'];
+        $logs    = $reportData['logs'];
+
+        $handle = fopen('php://temp', 'r+');
+
+        // Header row: Timestamp, then one column per sensor (label + unit)
+        $headers = ['Timestamp'];
+        foreach ($sensors as $sensor) {
+            $headers[] = "{$sensor['label']} ({$sensor['unit']})";
+        }
+        fputcsv($handle, $headers);
+
+        // Data rows
+        foreach ($logs as $log) {
+            $row = [$log['timestamp']];
+            foreach ($sensors as $sensor) {
+                $row[] = $log[$sensor['key']] ?? '';
+            }
+            fputcsv($handle, $row);
         }
 
-        $deltaH = 83.144; // Activation energy (kJ/mol)
-        $R = 0.008314; // Gas constant (kJ/mol·K)
+        // Statistics section
+        fputcsv($handle, []);
+        fputcsv($handle, ['--- Statistics ---']);
+        fputcsv($handle, ['Sensor', 'Min', 'Max', 'Avg', 'Std Dev', 'MKT', 'Count']);
 
-        $sumExp = 0;
-        $count = count($temperatures);
-
-        foreach ($temperatures as $temp) {
-            $tempKelvin = $temp + 273.15;
-            $sumExp += exp(-$deltaH / ($R * $tempKelvin));
+        foreach ($reportData['statistics'] as $stat) {
+            fputcsv($handle, [
+                $stat['label'],
+                $stat['min'],
+                $stat['max'],
+                $stat['avg'],
+                $stat['stddev'],
+                $stat['mkt'] ?? 'N/A',
+                $stat['count'],
+            ]);
         }
 
-        $mktKelvin = -$deltaH / ($R * log($sumExp / $count));
-        $mktCelsius = $mktKelvin - 273.15;
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
 
-        return round($mktCelsius, 2);
+        return $csv;
+    }
+
+    // ─── MKT Calculation ─────────────────────────────────────────────────────
+
+    /**
+     * Mean Kinetic Temperature (MKT) — ICH Q1A pharmaceutical standard.
+     *
+     * Formula:  MKT = (ΔH/R) / ln[ Σ(e^(-ΔH/RTi)) / n ]
+     *
+     * Where:
+     *   ΔH = 83,144 J/mol  (activation energy for degradation, ICH standard)
+     *   R  = 8.314 J/mol·K (universal gas constant)
+     *   Ti = temperature in Kelvin for each reading
+     *
+     * Must be done in PHP because it requires per-reading exp() which
+     * cannot be efficiently expressed as a single-pass SQL aggregate.
+     * We use the interval-bucketed averages as input (already aggregated by DB).
+     */
+    private function calculateMkt(array $temperatures): ?float
+    {
+        if (count($temperatures) < 2) {
+            return null;
+        }
+
+        $deltaH = 83144.0; // J/mol
+        $R      = 8.314;   // J/mol·K
+
+        $sumExp = 0.0;
+        $n      = count($temperatures);
+
+        foreach ($temperatures as $tempC) {
+            $tempK   = $tempC + 273.15;
+            $sumExp += exp(-$deltaH / ($R * $tempK));
+        }
+
+        if ($sumExp <= 0) {
+            return null;
+        }
+
+        $mktK = (-$deltaH / $R) / log($sumExp / $n);
+        return round($mktK - 273.15, 2);
     }
 }

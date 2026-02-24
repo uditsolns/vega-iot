@@ -17,7 +17,7 @@ class RoleService
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
-        $query = QueryBuilder::for(Role::class)
+        $query = QueryBuilder::for(Role::forUser($user))
             ->allowedFilters([
                 AllowedFilter::partial("name"),
                 AllowedFilter::exact("is_system_role"),
@@ -27,24 +27,19 @@ class RoleService
             ->allowedIncludes(["permissions", "company"])
             ->defaultSort("hierarchy_level");
 
-        // Filter: system roles OR user's company roles
-        if (!$user->isSuperAdmin()) {
-            $query->where(function ($q) use ($user) {
-                $q->where("is_system_role", true)->orWhere(
-                    "company_id",
-                    $user->company_id,
-                );
-            });
-        }
-
         return $query->paginate($filters["per_page"] ?? 20);
     }
 
     /**
      * Create a new role.
      */
-    public function create(array $data): Role
+    public function create(array $data, User $user): Role
     {
+        // Add company_id if not system user
+        if (!$user->ofSystem()) {
+            $data["company_id"] = $user->company_id;
+        }
+
         // company_id should be provided by controller
         $role = Role::create($data);
 
@@ -58,6 +53,7 @@ class RoleService
 
     /**
      * Update a role.
+     * @throws Exception
      */
     public function update(Role $role, array $data): Role
     {

@@ -28,9 +28,10 @@ interface ReportableInterface
     public function getFormat(): ReportFormat;
 
     /**
-     * Get the data formation type
+     * Returns the device_sensor_ids to include in this report.     *
+     * @return int[]
      */
-    public function getDataFormation(): ReportDataFormation;
+    public function getSensorIds(): array;
 
     /**
      * Get the data interval in minutes

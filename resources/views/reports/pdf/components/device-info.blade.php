@@ -1,79 +1,54 @@
-@php
-    $dataFormation = $data['data_formation'] ?? 'single_temperature';
-
-    $showHumidity = in_array($dataFormation, [
-        'combined_temperature_humidity',
-        'separate_temperature_humidity',
-        'combined_probe_temperature_humidity'
-    ]);
-
-    $showProbe = in_array($dataFormation, [
-        'combined_probe_temperature',
-        'combined_probe_temperature_humidity'
-    ]);
-@endphp
-
-<div class="section-title">Device Info</div>
+<div class="section-title">Device Information</div>
 
 <div class="info-grid">
     <div class="info-row">
-        <span class="label">Make:</span>
-        <span class="value">{{ $data['make'] ?? 'N/A' }}</span>
-    </div>
-
-    <div class="info-row">
         <span class="label">Device Name:</span>
-        <span class="value">{{ $data['device_name'] ?? 'N/A' }}</span>
+        <span>{{ $data['device']['device_name'] }}</span>
     </div>
-
     <div class="info-row">
-        <span class="label">Model:</span>
-        <span class="value">{{ $data['model'] ?? 'N/A' }}</span>
+        <span class="label">Device Code:</span>
+        <span>{{ $data['device']['device_code'] }}</span>
     </div>
-
     <div class="info-row">
         <span class="label">Serial No:</span>
-        <span class="value">{{ $data['serialno'] ?? 'N/A' }}</span>
+        <span>{{ $data['device']['device_uid'] }}</span>
     </div>
-
     <div class="info-row">
         <span class="label">Instrument ID:</span>
-        <span class="value">{{ $data['instrumentid'] ?? 'N/A' }}</span>
+        <span>{{ $data['device']['id'] }}</span>
     </div>
-
     <div class="info-row">
-        <span class="label">Temperature Resolution:</span>
-        <span class="value">{{ $data['temp_res'] ?? '0.1' }} °C</span>
+        <span class="label">Make / Vendor:</span>
+        <span>{{ $data['device']['make'] }}</span>
     </div>
-
     <div class="info-row">
-        <span class="label">Temperature Accuracy:</span>
-        <span class="value">± {{ $data['temp_acc'] ?? '0.5' }} °C</span>
+        <span class="label">Model:</span>
+        <span>{{ $data['device']['model'] }}</span>
     </div>
-
-    @if($showProbe)
-        <div class="info-row">
-            <span class="label">Temp Probe Resolution:</span>
-            <span class="value">{{ $data['tempprobe_res'] ?? '0.1' }} °C</span>
-        </div>
-
-        <div class="info-row">
-            <span class="label">Temp Probe Accuracy:</span>
-            <span class="value">± {{ $data['tempprobe_acc'] ?? '0.5' }} °C</span>
-        </div>
-    @endif
-
-    @if($showHumidity)
-        <div class="info-row">
-            <span class="label">Humidity Resolution:</span>
-            <span class="value">{{ $data['hum_res'] ?? '1.0' }} %RH</span>
-        </div>
-
-        <div class="info-row">
-            <span class="label">Humidity Accuracy:</span>
-            <span class="value">± {{ $data['hum_acc'] ?? '3.0' }} %RH</span>
-        </div>
-    @endif
+    <div class="info-row">
+        <span class="label">Firmware:</span>
+        <span>{{ $data['device']['firmware'] }}</span>
+    </div>
+    <div class="info-row">
+        <span class="label">Location:</span>
+        <span>{{ $data['device']['location'] }}</span>
+    </div>
 </div>
+
+{{-- Per-sensor accuracy / resolution rows --}}
+@foreach($data['sensors'] as $sensor)
+    @if($sensor['accuracy'] || $sensor['resolution'])
+        <div class="info-grid" style="margin-top:4px">
+            <div class="info-row">
+                <span class="label">{{ $sensor['label'] }} Resolution:</span>
+                <span>{{ $sensor['resolution'] ?? '–' }} {{ $sensor['unit'] }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">{{ $sensor['label'] }} Accuracy:</span>
+                <span>± {{ $sensor['accuracy'] ?? '–' }} {{ $sensor['unit'] }}</span>
+            </div>
+        </div>
+    @endif
+@endforeach
 
 <div class="divider"></div>

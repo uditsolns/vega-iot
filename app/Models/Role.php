@@ -76,6 +76,15 @@ class Role extends Model
         return $this->hasMany(User::class);
     }
 
+    public function scopeForUser(Builder $query, User $user): Builder {
+        if ($user->ofSystem()) {
+            return $query;
+        }
+
+        return $query->where("is_system_role", true)
+            ->orWhere("company_id", $user->company_id);
+    }
+
     /**
      * Scope a query to only include system roles.
      */

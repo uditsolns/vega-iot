@@ -22,7 +22,7 @@ class Report extends Model implements ReportableInterface
         'name',
         'file_type',
         'format',
-        'data_formation',
+        'sensor_ids',
         'interval',
         'from_datetime',
         'to_datetime',
@@ -58,7 +58,7 @@ class Report extends Model implements ReportableInterface
         return [
             'file_type' => ReportFileType::class,
             'format' => ReportFormat::class,
-            'data_formation' => ReportDataFormation::class,
+            'sensor_ids'     => 'array',
             'from_datetime' => 'datetime',
             'to_datetime' => 'datetime',
             'generated_at' => 'datetime',
@@ -109,5 +109,30 @@ class Report extends Model implements ReportableInterface
     public function getCompanyId(): int
     {
         return $this->company_id;
+    }
+
+    public function getSensorIds(): array
+    {
+        return $this->sensor_ids;
+    }
+
+    /**
+     * Returns the correct HTTP Content-Type header for the report's file type.
+     */
+    public function contentType(): string
+    {
+        return match ($this->file_type) {
+            ReportFileType::Pdf => 'application/pdf',
+            ReportFileType::Csv => 'text/csv',
+        };
+    }
+
+    /**
+     * Returns the download filename for the report.
+     */
+    public function downloadFilename(): string
+    {
+        $ext = $this->file_type->value;
+        return "{$this->name}.{$ext}";
     }
 }

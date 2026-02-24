@@ -30,14 +30,7 @@ class RoleController extends Controller
     {
         $this->authorize("create", Role::class);
 
-        $data = $request->validated();
-
-        // Add company_id if not super admin
-        if (!$request->user()->isSuperAdmin()) {
-            $data["company_id"] = $request->user()->company_id;
-        }
-
-        $role = $this->roleService->create($data);
+        $role = $this->roleService->create($request->validated(), $request->user());
 
         return $this->created(
             new RoleResource($role),

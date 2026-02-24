@@ -153,6 +153,10 @@ class User extends Authenticatable
         return $rolePermissions->merge($userPermissions)->unique("id");
     }
 
+    public function ofSystem(): bool {
+        return $this->company_id == null;
+    }
+
     /**
      * Check if the user is a super admin.
      */

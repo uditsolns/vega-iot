@@ -5,113 +5,22 @@
     @include('reports.pdf.components.logger-summary')
     @include('reports.pdf.components.statistics')
 
-    <div class="section-title">Trend</div>
+    <div class="section-title">Trend Charts</div>
 
     @php
-        $dataFormation = $data['data_formation'] ?? 'single_temperature';
-        $logs = $data['logs'];
+        $logs    = $data['logs'];
+        $sensors = $data['sensors'];
+
+        // Assign distinct colours to sensors for visual differentiation
+        $palette = ['#305CDE', '#16a34a', '#b51bfc', '#e67e00', '#e11d48', '#0891b2', '#7c3aed', '#d97706'];
     @endphp
 
-    @if($dataFormation === 'single_temperature')
-        <div class="subsection-title">Temperature</div>
-        @include('reports.pdf.components.chart-single', [
-            'logs' => $logs,
-            'dataKey' => 'temperature',
-            'label' => 'Temperature (°C)',
-            'color' => '#305CDE',
-            'minThreshold' => $data['min_temp'] ?? null,
-            'maxThreshold' => $data['max_temp'] ?? null,
+    @foreach($sensors as $index => $sensor)
+        <div class="subsection-title">{{ $sensor['label'] }}</div>
+        @include('reports.pdf.components.chart-sensor', [
+            'sensor'     => $sensor,
+            'logs'       => $logs,
+            'chartColor' => $palette[$index % count($palette)],
         ])
-
-    @elseif($dataFormation === 'combined_temperature_humidity')
-        <div class="subsection-title">Temperature & Humidity</div>
-        @include('reports.pdf.components.chart-dual', [
-            'logs' => $logs,
-            'leftAxis' => [
-                'dataKey' => 'temperature',
-                'label' => 'Temperature (°C)',
-                'color' => '#305CDE',
-                'min' => $data['min_temp'] ?? null,
-                'max' => $data['max_temp'] ?? null,
-            ],
-            'rightAxis' => [
-                'dataKey' => 'humidity',
-                'label' => 'Humidity (%RH)',
-                'color' => 'green',
-                'min' => $data['min_hum'] ?? null,
-                'max' => $data['max_hum'] ?? null,
-            ],
-        ])
-
-    @elseif($dataFormation === 'separate_temperature_humidity')
-        <div class="subsection-title">Temperature</div>
-        @include('reports.pdf.components.chart-single', [
-            'logs' => $logs,
-            'dataKey' => 'temperature',
-            'label' => 'Temperature (°C)',
-            'color' => '#305CDE',
-            'minThreshold' => $data['min_temp'] ?? null,
-            'maxThreshold' => $data['max_temp'] ?? null,
-        ])
-
-        <div class="subsection-title" style="margin-top: 15px;">Humidity</div>
-        @include('reports.pdf.components.chart-single', [
-            'logs' => $logs,
-            'dataKey' => 'humidity',
-            'label' => 'Humidity (%RH)',
-            'color' => 'green',
-            'minThreshold' => $data['min_hum'] ?? null,
-            'maxThreshold' => $data['max_hum'] ?? null,
-        ])
-
-    @elseif($dataFormation === 'combined_probe_temperature')
-        <div class="subsection-title">Temperature & Temp Probe</div>
-        @include('reports.pdf.components.chart-dual', [
-            'logs' => $logs,
-            'leftAxis' => [
-                'dataKey' => 'temperature',
-                'label' => 'Temperature (°C)',
-                'color' => '#305CDE',
-                'min' => $data['min_temp'] ?? null,
-                'max' => $data['max_temp'] ?? null,
-            ],
-            'rightAxis' => [
-                'dataKey' => 'tempprobe',
-                'label' => 'Temp Probe (°C)',
-                'color' => '#b51bfc',
-                'min' => $data['min_tempprobe'] ?? null,
-                'max' => $data['max_tempprobe'] ?? null,
-            ],
-        ])
-
-    @elseif($dataFormation === 'combined_probe_temperature_humidity')
-        <div class="subsection-title">Temperature & Temp Probe</div>
-        @include('reports.pdf.components.chart-dual', [
-            'logs' => $logs,
-            'leftAxis' => [
-                'dataKey' => 'temperature',
-                'label' => 'Temperature (°C)',
-                'color' => '#305CDE',
-                'min' => $data['min_temp'] ?? null,
-                'max' => $data['max_temp'] ?? null,
-            ],
-            'rightAxis' => [
-                'dataKey' => 'tempprobe',
-                'label' => 'Temp Probe (°C)',
-                'color' => '#b51bfc',
-                'min' => $data['min_tempprobe'] ?? null,
-                'max' => $data['max_tempprobe'] ?? null,
-            ],
-        ])
-
-        <div class="subsection-title" style="margin-top: 15px;">Humidity</div>
-        @include('reports.pdf.components.chart-single', [
-            'logs' => $logs,
-            'dataKey' => 'humidity',
-            'label' => 'Humidity (%RH)',
-            'color' => 'green',
-            'minThreshold' => $data['min_hum'] ?? null,
-            'maxThreshold' => $data['max_hum'] ?? null,
-        ])
-    @endif
+    @endforeach
 @endsection

@@ -12,41 +12,39 @@ use Illuminate\Http\Response;
 
 class ReportController extends Controller
 {
-    public function __construct(readonly private ReportService $reportService){}
+    public function __construct(readonly private ReportService $reportService) {}
 
     public function index(Request $request)
     {
-        $this->authorize("viewAny", Report::class);
+        $this->authorize('viewAny', Report::class);
 
-        $reports = $this->reportService->list(
-            $request->all(),
-            $request->user(),
-        );
+        $reports = $this->reportService->list($request->all(), $request->user());
 
         return $this->collection(ReportResource::collection($reports));
     }
 
     public function store(CreateReportRequest $request): Response
     {
-        $this->authorize("create", Report::class);
+        $this->authorize('create', Report::class);
 
-        // Create report record
-        $report = $this->reportService->create(
-            $request->validated(),
-            $request->user(),
-        );
+        $report  = $this->reportService->create($request->validated(), $request->user());
+        $content = $this->reportService->generate($report);
 
-        $pdfContent = $this->reportService->generate($report);
-
-        return response($pdfContent, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $report->name . '.pdf"',
+        return response($content, 200, [
+            'Content-Type'        => $report->contentType(),
+            'Content-Disposition' => 'attachment; filename="' . $report->downloadFilename() . '"',
         ]);
     }
 
-    public function download(Report $report) {
-        $this->authorize("viewAny", Report::class);
+    public function download(Report $report): Response
+    {
+        $this->authorize('view', $report);
 
-        return $this->reportService->generate($report);
+        $content = $this->reportService->generate($report);
+
+        return response($content, 200, [
+            'Content-Type'        => $report->contentType(),
+            'Content-Disposition' => 'attachment; filename="' . $report->downloadFilename() . '"',
+        ]);
     }
 }

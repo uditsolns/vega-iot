@@ -1,99 +1,72 @@
 @php
-    function getColorClass($value, $min, $max, $minWarn = null, $maxWarn = null) {
-        if ($value === null) return 'normal';
+    /**
+     * Returns CSS class based on value vs thresholds.
+     * Critical > Warning > Normal.
+     */
+    function getSensorColorClass(mixed $value, array $sensor): string {
+        if ($value === null) return 'val-normal';
 
-        if (($min !== null && $value < $min) || ($max !== null && $value > $max)) {
-            return 'critical';
+        $v = (float) $value;
+
+        // Critical check
+        if (($sensor['min_critical'] !== null && $v < (float)$sensor['min_critical'])
+            || ($sensor['max_critical'] !== null && $v > (float)$sensor['max_critical'])) {
+            return 'val-critical';
         }
 
-        if ($minWarn !== null && $maxWarn !== null) {
-            if ($value < $minWarn || $value > $maxWarn) {
-                return 'warning';
-            }
+        // Warning check
+        if (($sensor['min_warning'] !== null && $v < (float)$sensor['min_warning'])
+            || ($sensor['max_warning'] !== null && $v > (float)$sensor['max_warning'])) {
+            return 'val-warning';
         }
 
-        return 'normal';
+        return 'val-normal';
     }
+
+    $colCount   = count($sensors);
+    $valueWidth = $colCount > 0 ? round((67 / $colCount), 1) : 67;
 @endphp
 
 <div class="page-break"></div>
-
 <div class="subsection-title">Tabular Data</div>
 
 <table class="data-table">
     <thead>
     <tr>
-        <th style="width: 8%;">Sr. No.</th>
-        <th style="width: 25%;">Date & Time</th>
-
-        @if(in_array('temperature', $columns))
-            <th style="width: {{ count($columns) === 1 ? '67%' : (count($columns) === 2 ? '33.5%' : '22.33%') }};">Temperature (°C)</th>
-        @endif
-
-        @if(in_array('tempprobe', $columns))
-            <th style="width: {{ count($columns) === 2 ? '33.5%' : '22.33%' }};">Temp Probe (°C)</th>
-        @endif
-
-        @if(in_array('humidity', $columns))
-            <th style="width: {{ count($columns) === 2 ? '33.5%' : '22.33%' }};">Humidity (%RH)</th>
-        @endif
+        <th style="width:6%">Sr.</th>
+        <th style="width:{{ max(20, 27 - ($colCount * 2)) }}%">Date &amp; Time</th>
+        @foreach($sensors as $sensor)
+            <th style="width:{{ $valueWidth }}%">
+                {{ $sensor['label'] }}<br>({{ $sensor['unit'] }})
+            </th>
+        @endforeach
     </tr>
     </thead>
     <tbody>
-    @foreach($logs as $index => $log)
+    @foreach($logs as $i => $log)
         <tr>
-            <td>{{ $index + 1 }}</td>
+            <td>{{ $i + 1 }}</td>
             <td>{{ $log['timestamp'] }}</td>
-
-            @if(in_array('temperature', $columns))
+            @foreach($sensors as $sensor)
                 @php
-                    $tempClass = getColorClass(
-                        $log['temperature'] ?? null,
-                        $data['min_temp'] ?? null,
-                        $data['max_temp'] ?? null,
-                        $data['min_warn_temp'] ?? null,
-                        $data['max_warn_temp'] ?? null
-                    );
+                    $val   = $log[$sensor['key']] ?? null;
+                    $class = getSensorColorClass($val, $sensor);
                 @endphp
-                <td class="{{ $tempClass }}">
-                    {{ $log['temperature'] !== null ? number_format($log['temperature'], 1) : 'N/A' }}
+                <td class="{{ $class }}">
+                    {{ $val !== null ? number_format((float)$val, 2) : '–' }}
                 </td>
-            @endif
-
-            @if(in_array('tempprobe', $columns))
-                @php
-                    $probeClass = getColorClass(
-                        $log['tempprobe'] ?? null,
-                        $data['min_tempprobe'] ?? null,
-                        $data['max_tempprobe'] ?? null,
-                        $data['min_warn_tempProbe'] ?? null,
-                        $data['max_Warn_tempProbe'] ?? null
-                    );
-                @endphp
-                <td class="{{ $probeClass }}">
-                    {{ $log['tempprobe'] !== null ? number_format($log['tempprobe'], 1) : 'N/A' }}
-                </td>
-            @endif
-
-            @if(in_array('humidity', $columns))
-                @php
-                    $humClass = getColorClass(
-                        $log['humidity'] ?? null,
-                        $data['min_hum'] ?? null,
-                        $data['max_hum'] ?? null,
-                        $data['min_warn_hum'] ?? null,
-                        $data['max_warn_hum'] ?? null
-                    );
-                @endphp
-                <td class="{{ $humClass }}">
-                    {{ $log['humidity'] !== null ? number_format($log['humidity'], 1) : 'N/A' }}
-                </td>
-            @endif
+            @endforeach
         </tr>
     @endforeach
     </tbody>
 </table>
 
-<div style="margin-top: 10px; font-size: 7pt;">
-    <span class="label">Total Records:</span> {{ count($logs) }}
+<div style="margin-top:8px; font-size:7pt">
+    <span class="label">Total Intervals:</span> {{ count($logs) }}
+    &nbsp;|&nbsp;
+    <span class="label">Interval:</span> {{ $data['logger']['interval'] }} mins
+    &nbsp;|&nbsp;
+    <span style="color:#ff0000; font-weight:bold">■</span> Critical
+    &nbsp;
+    <span style="color:#ff8c00; font-weight:bold">■</span> Warning
 </div>

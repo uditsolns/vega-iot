@@ -2,24 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $data['report_name'] ?? 'Report' }}</title>
 
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src={{public_path("vendor/chart.umd.js")}}></script>
+    <script src={{public_path("vendor/chart-plugin-annotation.min.js")}}></script>
 
     <style>
-        @page {
-            size: A4;
-            margin: 10mm 10mm 10mm 10mm;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        @page { size: A4; margin: 10mm; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -28,6 +18,7 @@
             line-height: 1.4;
         }
 
+        /* ── Header ── */
         .page-header {
             border-bottom: 0.5px solid #666;
             padding-bottom: 5px;
@@ -36,34 +27,15 @@
             align-items: center;
             justify-content: space-between;
         }
+        .header-logo   { width: 50px; height: auto; }
+        .header-center { text-align: center; flex: 1; }
+        .header-title  { color: #003366; font-weight: bold; font-size: 11pt; margin-bottom: 2px; }
+        .header-sub    { font-size: 8pt; }
 
-        .header-logo {
-            width: 50px;
-            height: auto;
-        }
-
-        .header-center {
-            text-align: center;
-            flex: 1;
-        }
-
-        .header-title {
-            color: #003366;
-            font-weight: bold;
-            font-size: 11pt;
-            margin-bottom: 2px;
-        }
-
-        .header-subtitle {
-            font-size: 8pt;
-            color: #000;
-        }
-
+        /* ── Footer ── */
         .page-footer {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: 0; left: 0; right: 0;
             border-top: 0.5px solid #666;
             padding: 5px 10mm;
             font-size: 7pt;
@@ -72,73 +44,47 @@
             justify-content: space-between;
         }
 
-        .footer-left {
-            flex: 1;
-        }
-
-        .footer-right {
-            text-align: right;
-        }
-
+        /* ── Sections ── */
         .section-title {
             color: #003366;
             font-weight: bold;
             font-size: 10pt;
-            margin: 10px 0 5px 0;
+            margin: 10px 0 5px;
             page-break-after: avoid;
         }
-
         .subsection-title {
             color: #003366;
             font-weight: bold;
             font-size: 9pt;
-            margin: 8px 0 5px 0;
+            margin: 8px 0 5px;
         }
+        .divider { border-top: 0.5px solid #666; margin: 8px 0; }
 
+        /* ── Info grid ── */
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 5px 20px;
             margin-bottom: 8px;
         }
+        .info-row { font-size: 8pt; line-height: 1.5; }
+        .label    { font-weight: bold; }
 
-        .info-row {
-            font-size: 8pt;
-            line-height: 1.5;
-        }
-
-        .label {
-            font-weight: bold;
-        }
-
-        .value {
-            font-weight: normal;
-        }
-
-        .divider {
-            border-top: 0.5px solid #666;
-            margin: 8px 0;
-        }
-
-        /* Chart Styles */
+        /* ── Chart ── */
         .chart-container {
             margin: 10px 0;
             page-break-inside: avoid;
-            height: 300px;
+            height: 280px;
         }
+        .chart-container canvas { max-height: 280px !important; }
 
-        .chart-container canvas {
-            max-height: 300px !important;
-        }
-
-        /* Table Styles */
+        /* ── Table ── */
         table.data-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
             table-layout: fixed;
         }
-
         table.data-table th {
             background-color: #003366;
             color: #fff;
@@ -148,70 +94,49 @@
             text-align: center;
             border: 0.5px solid #bebebe;
         }
-
         table.data-table td {
             font-size: 6pt;
             padding: 2px 4px;
             text-align: center;
             border: 0.5px solid #bebebe;
         }
-
-        .critical {
-            color: #ff0000;
-            font-weight: bold;
-        }
-
-        .warning {
-            color: #ff8c00;
-            font-weight: bold;
-        }
-
-        .normal {
-            color: #000;
-        }
+        .val-critical { color: #ff0000; font-weight: bold; }
+        .val-warning  { color: #ff8c00; font-weight: bold; }
+        .val-normal   { color: #000; }
 
         @media print {
-            .page-break {
-                page-break-before: always;
-            }
-
-            .no-break {
-                page-break-inside: avoid;
-            }
+            .page-break           { page-break-before: always; }
+            .no-break             { page-break-inside: avoid; }
         }
     </style>
 </head>
 <body>
-<!-- Header -->
+
+{{-- ── Page Header ── --}}
 <div class="page-header">
-    <div style="width: 50px;">
+    <div style="width:50px">
         <img src="{{ public_path('vega-logo.png') }}" class="header-logo" alt="Logo">
     </div>
     <div class="header-center">
         <div class="header-title">Data Report</div>
-        <div class="header-subtitle">{{ $data['report_name'] ?? 'Report' }}</div>
+        <div class="header-sub">{{ $data['report_name'] ?? 'Report' }}</div>
     </div>
-    <div style="width: 50px;"></div>
+    <div style="width:50px"></div>
 </div>
 
-<!-- Content -->
+{{-- ── Content ── --}}
 @yield('content')
 
-<!-- Footer -->
+{{-- ── Page Footer ── --}}
 <div class="page-footer">
-    <div class="footer-left">
-        <div>
-            <span>Report Generated by: </span>
-            <span style="color: #003366;">{{ $data['user_name'] ?? 'System' }}</span>
-            <span> @ {{ now()->format('d-m-Y H:i:s') }}</span>
-        </div>
-        <div style="margin-top: 3px;">
-            This is a computer-generated report, no signature is required ***
-        </div>
+    <div>
+        <span class="label">Generated by:</span>
+        <span style="color:#003366">{{ $data['user_name'] }}</span>
+        &nbsp;@&nbsp;{{ now()->format('d-m-Y H:i:s') }}
+        &nbsp;|&nbsp; This is a computer-generated report, no signature required ***
     </div>
-    <div class="footer-right">
-        <div>Copyright © Vega™</div>
-    </div>
+    <div>Copyright © Vega™</div>
 </div>
+
 </body>
 </html>

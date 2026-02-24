@@ -14,15 +14,15 @@ use Carbon\Carbon;
 readonly class ReportGenerationDTO
 {
     public function __construct(
-        public int                 $deviceId,
-        public int                 $companyId,
-        public string              $reportName,
-        public ReportFileType      $fileType,
-        public ReportFormat        $format,
-        public ReportDataFormation $dataFormation,
-        public int                 $interval,
-        public Carbon              $fromDatetime,
-        public Carbon              $toDatetime,
+        public int            $deviceId,
+        public int            $companyId,
+        public string         $reportName,
+        public ReportFileType $fileType,
+        public ReportFormat   $format,
+        public array          $sensorIds,
+        public int            $interval,
+        public Carbon         $fromDatetime,
+        public Carbon         $toDatetime,
     ) {}
 
     /**
@@ -36,7 +36,7 @@ readonly class ReportGenerationDTO
             reportName: $reportable->getReportName(),
             fileType: $reportable->getFileType(),
             format: $reportable->getFormat(),
-            dataFormation: $reportable->getDataFormation(),
+            sensorIds: $reportable->getSensorIds(),
             interval: $reportable->getInterval(),
             fromDatetime: $reportable->getFromDatetime(),
             toDatetime: $reportable->getToDatetime(),

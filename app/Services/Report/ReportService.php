@@ -2,10 +2,12 @@
 
 namespace App\Services\Report;
 
+use App\Enums\ReportFileType;
 use App\Models\Report;
 use App\Models\User;
 use App\Notifications\ReportGeneratedNotification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\Response;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -15,57 +17,50 @@ readonly class ReportService
         private ReportGeneratorService $reportGenerator
     ) {}
 
-    /**
-     * Get paginated list of reports.
-     */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
         return QueryBuilder::for(Report::forUser($user))
             ->allowedFilters([
-                AllowedFilter::partial("name"),
-                AllowedFilter::callback("from", function ($query, $value) {
-                    $query->where("generated_at", ">=", $value);
-                }),
-                AllowedFilter::callback("to", function ($query, $value) {
-                    $query->where("generated_at", "<=", $value);
-                }),
-                AllowedFilter::exact("generated_by"),
-                AllowedFilter::exact("device_id"),
-                AllowedFilter::exact("company_id"),
+                AllowedFilter::partial('name'),
+                AllowedFilter::callback('from', fn($q, $v) => $q->where('generated_at', '>=', $v)),
+                AllowedFilter::callback('to', fn($q, $v) => $q->where('generated_at', '<=', $v)),
+                AllowedFilter::exact('generated_by'),
+                AllowedFilter::exact('device_id'),
+                AllowedFilter::exact('company_id'),
             ])
-            ->allowedSorts([
-                "generated_at",
-            ])
-            ->allowedIncludes(["company", "device", "generatedBy"])
-            ->defaultSort("-generated_at")
-            ->paginate($filters["per_page"] ?? 20);
+            ->allowedSorts(['generated_at'])
+            ->allowedIncludes(['company', 'device', 'generatedBy'])
+            ->defaultSort('-generated_at')
+            ->paginate($filters['per_page'] ?? 20);
     }
 
-    /**
-     * Create a new report record
-     */
     public function create(array $data, User $user): Report
     {
-        // Create report record
-        $data['generated_by'] = $user->id;
-        $data['company_id'] = $user->company_id;
-        $report = Report::create($data);
+        $report = Report::create([
+            'company_id'    => $user->company_id,
+            'device_id'     => $data['device_id'],
+            'generated_by'  => $user->id,
+            'name'          => $data['name'],
+            'file_type'     => $data['file_type'],
+            'format'        => $data['format'],
+            'sensor_ids'    => $data['sensor_ids'],
+            'interval'      => $data['interval'],
+            'from_datetime' => $data['from_datetime'],
+            'to_datetime'   => $data['to_datetime'],
+        ]);
 
-        // Audit log
-        activity("report")
-            ->event("generated")
+        activity('report')
+            ->event('generated')
             ->performedOn($report)
-            ->withProperties([
-                'report_id' => $report->id,
-                'data_formation' => $report->data_formation->value,
-            ])
-            ->log("Generated report \"$report->name\"");
+            ->withProperties(['sensor_ids' => $data['sensor_ids']])
+            ->log("Generated report \"{$report->name}\"");
 
         return $report->fresh(['generatedBy']);
     }
 
     /**
-     * Generate report file
+     * Generate file content from a report record.
+     * Returns raw bytes (PDF) or string (CSV).
      */
     public function generate(Report $report): string
     {

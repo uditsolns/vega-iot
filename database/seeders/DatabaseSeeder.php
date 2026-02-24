@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             SensorTypeSeeder::class,
             DeviceModelSeeder::class,
             DeviceSeeder::class,
+            SensorReadingSeeder::class,
         ]);
     }
 }

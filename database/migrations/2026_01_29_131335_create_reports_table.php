@@ -21,8 +21,8 @@ return new class extends Migration {
             $table->enum('file_type', ReportFileType::values())->default(ReportFileType::Pdf->value);
             $table->enum('format', ReportFormat::values())
                 ->default(ReportFormat::Graphical->value);
-            $table->enum('data_formation', ReportDataFormation::values())
-                ->default(ReportDataFormation::SingleTemperature->value);
+            $table->jsonb('sensor_ids')
+                ->comment('Array of device_sensor_id values selected for this report');
             $table->integer('interval');
             $table->dateTime('from_datetime');
             $table->dateTime('to_datetime');
