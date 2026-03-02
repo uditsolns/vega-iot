@@ -2,8 +2,7 @@
 
 namespace App\Channels;
 
-use App\Notifications\Messages\MsgClubEmailMessage;
-use App\Services\Notification\Providers\MsgClubProvider;
+use App\Providers\MsgClubProvider;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
@@ -20,7 +19,8 @@ class MsgClubEmailChannel
     {
         // Get email from notifiable
         if (!$email = $notifiable->routeNotificationFor('msgclub_email', $notification)) {
-            Log::warning('No email for email notification', [
+            // Log here only — provider never sees this case
+            Log::warning('[MsgClubEmail] No email address on notifiable', [
                 'notifiable_id' => $notifiable->id,
                 'notification' => get_class($notification),
             ]);
@@ -33,11 +33,7 @@ class MsgClubEmailChannel
         // Render HTML content
         $htmlContent = $message->render();
 
-        // Get attachments (file paths)
-        $attachmentPaths = [];
-        foreach ($message->getAttachments() as $attachment) {
-            $attachmentPaths[] = $attachment['path'];
-        }
+        $attachmentPaths = array_column($message->getAttachments(), 'path');
 
         // Send via provider with attachments
         $response = $this->provider->sendEmail(
@@ -48,17 +44,10 @@ class MsgClubEmailChannel
             attachments: $attachmentPaths
         );
 
-        // Throw exception on failure (will trigger retry)
+        // Provider already logs success, API rejections, network errors, and invalid responses.
+        // Re-throw on failure so the queued job retries and eventually lands in failed_jobs.
         if (!$response['success']) {
-            throw new \Exception($response['error'] ?? 'Email sending failed');
+            throw new \Exception("[MsgClubEmail] {$response['error']}");
         }
-
-        Log::info('Email notification sent', [
-            'notifiable_id' => $notifiable->id,
-            'email' => $email,
-            'subject' => $message->subject,
-            'attachments_count' => count($attachmentPaths),
-            'reference' => $response['reference'] ?? null,
-        ]);
     }
 }

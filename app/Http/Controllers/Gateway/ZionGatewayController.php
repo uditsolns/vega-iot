@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Gateway;
 
 use App\Enums\ConfigRequestStatus;
+use App\Enums\DeviceStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\DeviceConfigurationRequest;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Log;
  * Handles inbound HTTP POST requests from Zion IoT loggers.
  *
  * URL:  POST /gateway/zion
- * Query params: sendingMode, deviceUid (MAC address)
+ * Query params: sendingMode, deviceUid (MAC address, no colons, lowercase hex)
  *
  * Flow:
  *  1. Identify device by deviceUid (query param or body)
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Log;
 class ZionGatewayController extends Controller
 {
     public function __construct(
-        private readonly ZionAdapter            $adapter,
+        private readonly ZionAdapter             $adapter,
         private readonly ReadingIngestionService $ingestion,
     ) {}
 
@@ -47,7 +48,7 @@ class ZionGatewayController extends Controller
 
         if (!$device) {
             Log::warning('[Zion] Unknown device', ['device_uid' => $deviceUid]);
-            // Still return success to prevent device from retrying indefinitely
+            // Still return success to prevent the device from retrying indefinitely
             return response()->json($this->adapter->buildSuccessResponse());
         }
 
@@ -62,7 +63,7 @@ class ZionGatewayController extends Controller
             $batches = $this->adapter->parseReadings($request);
             if (!empty($batches)) {
                 $this->ingestion->ingestBatches($device, $batches);
-                $device->update(['status' => 'online']);
+                $device->updateQuietly(['status' => DeviceStatus::Online]);
             }
         } catch (\Throwable $e) {
             Log::error('[Zion] Ingestion failed', [
@@ -83,12 +84,12 @@ class ZionGatewayController extends Controller
 
     private function markConfigConfirmed(Device $device): void
     {
-        $request = DeviceConfigurationRequest::where('device_id', $device->id)
+        $pending = DeviceConfigurationRequest::where('device_id', $device->id)
             ->where('status', ConfigRequestStatus::Sent)
             ->latest()
             ->first();
 
-        $request?->markConfirmed();
+        $pending?->markConfirmed();
     }
 
     private function getPendingCommand(Device $device): ?string

@@ -19,8 +19,6 @@ class AlertResource extends JsonResource
         return [
             'id' => $this->id,
             'device_id' => $this->device_id,
-            'type' => $this->type->value,
-            'type_label' => $this->type->label(),
             'severity' => $this->severity->value,
             'severity_label' => $this->severity->label(),
             'status' => $this->status->value,
@@ -46,7 +44,6 @@ class AlertResource extends JsonResource
             'resolved_at' => $this->resolved_at,
             'resolved_by' => $this->resolved_by,
             'resolve_comment' => $this->resolve_comment,
-            'is_back_in_range' => $this->is_back_in_range,
 
             // Notification tracking
             'last_notification_at' => $this->last_notification_at,

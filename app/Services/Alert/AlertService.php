@@ -2,25 +2,22 @@
 
 namespace App\Services\Alert;
 
-use App\Enums\AlertStatus;
 use App\Models\Alert;
-use App\Models\Area;
-use App\Models\Location;
 use App\Models\User;
 use App\Notifications\AlertAcknowledgedNotification;
 use App\Notifications\AlertResolvedNotification;
-use Carbon\Carbon;
+use App\Traits\ResolvesAlertRecipients;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 readonly class AlertService
 {
+    use ResolvesAlertRecipients;
 
     /**
-     * List alerts with filtering, sorting, and includes
+     * List alerts with filtering, sorting, and includes.
      */
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -30,7 +27,6 @@ readonly class AlertService
                 AllowedFilter::exact("severity"),
                 AllowedFilter::exact("type"),
                 AllowedFilter::exact("device_id"),
-                AllowedFilter::exact("is_back_in_range"),
                 AllowedFilter::scope("active"),
                 AllowedFilter::scope("acknowledged"),
                 AllowedFilter::scope("open"),
@@ -57,17 +53,25 @@ readonly class AlertService
     }
 
     /**
+     * Get alert details with full relationships.
+     */
+    public function show(Alert $alert): Alert
+    {
+        return $alert->load([
+            'device.area.hub.location',
+            'deviceSensor.sensorType',
+            'acknowledgedBy',
+            'resolvedBy',
+        ]);
+    }
+
+    /**
      * Acknowledge an alert
      */
-    public function acknowledge(
-        Alert $alert,
-        User $user,
-        ?string $comment = null,
-    ): Alert {
+    public function acknowledge(Alert $alert, User $user, ?string $comment = null): Alert
+    {
         if (!$alert->acknowledge($user, $comment)) {
-            throw new \InvalidArgumentException(
-                "Only active alerts can be acknowledged",
-            );
+            throw new \InvalidArgumentException('Only active alerts can be acknowledged.');
         }
 
         // Audit log
@@ -80,14 +84,7 @@ readonly class AlertService
             ])
             ->log("Acknowledged {$alert->severity->value} alert for device \"{$alert->device->device_code}\"");
 
-        $user->notify(new AlertAcknowledgedNotification(
-            alertId: $alert->id,
-            deviceId: $alert->device_id,
-            deviceCode: $alert->device->device_code,
-            acknowledgedBy: $user->id,
-            acknowledgedByName: "{$user->first_name} {$user->last_name}",
-            acknowledgedAt: $alert->acknowledged_at->toDateTimeString()
-        ));
+        $this->sendAcknowledgedNotification($alert->fresh(['device.area.hub.location', 'deviceSensor.sensorType']), $user);
 
         return $alert->fresh();
     }
@@ -95,15 +92,10 @@ readonly class AlertService
     /**
      * Resolve an alert
      */
-    public function resolve(
-        Alert $alert,
-        User $user,
-        ?string $comment = null,
-    ): Alert {
-        if (!$alert->resolve($user, $comment, false)) {
-            throw new \InvalidArgumentException(
-                "Only active or acknowledged alerts can be resolved",
-            );
+    public function resolve(Alert $alert, User $user, ?string $comment = null): Alert
+    {
+        if (!$alert->resolve($user, $comment)) {
+            throw new \InvalidArgumentException('Only active or acknowledged alerts can be resolved.');
         }
 
         // Audit log
@@ -116,23 +108,48 @@ readonly class AlertService
             ])
             ->log("Resolved {$alert->severity->value} alert for device \"{$alert->device->device_code}\"");
 
-        $user->notify(new AlertResolvedNotification(
-            alertId: $alert->id,
-            deviceId: $alert->device_id,
-            deviceCode: $alert->device->device_code,
-            resolvedBy: $user->id,
-            resolvedByName: "{$user->first_name} {$user->last_name}",
-            resolvedAt: $alert->resolved_at->toDateTimeString()
-        ));
+        $this->sendResolvedNotification($alert->fresh(['device.area.hub.location', 'deviceSensor.sensorType']), $user);
 
         return $alert->fresh();
     }
 
-    /**
-     * Get alert details with full relationships
-     */
-    public function show(Alert $alert): Alert
+    // ─── Notification dispatchers ─────────────────────────────────────────────
+
+    private function sendAcknowledgedNotification(Alert $alert, User $actingUser): void
     {
-        return $alert->load(["device.area", "acknowledgedBy", "resolvedBy"]);
+        $users = $this->getUsersToNotify($alert->device->area);
+
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        Notification::send($users, new AlertAcknowledgedNotification(
+            alertId:             $alert->id,
+            deviceId:            $alert->device_id,
+            deviceCode:          $alert->device->device_code,
+            sensorLabel:         $alert->sensor_label,
+            acknowledgedBy:      $actingUser->id,
+            acknowledgedByName:  trim("{$actingUser->first_name} {$actingUser->last_name}"),
+            acknowledgedAt:      $alert->acknowledged_at->toDateTimeString(),
+        ));
+    }
+
+    private function sendResolvedNotification(Alert $alert, User $actingUser): void
+    {
+        $users = $this->getUsersToNotify($alert->device->area);
+
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        Notification::send($users, new AlertResolvedNotification(
+            alertId:          $alert->id,
+            deviceId:         $alert->device_id,
+            deviceCode:       $alert->device->device_code,
+            sensorLabel:      $alert->sensor_label,
+            resolvedBy:       $actingUser->id,
+            resolvedByName:   trim("{$actingUser->first_name} {$actingUser->last_name}"),
+            resolvedAt:       $alert->resolved_at->toDateTimeString(),
+        ));
     }
 }

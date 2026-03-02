@@ -16,7 +16,7 @@
     <table class="info-table">
         <tr>
             <td>Device Code:</td>
-            <td>{{ $device->device_code }}</td>
+            <td><strong>{{ $device->device_code }}</strong></td>
         </tr>
         <tr>
             <td>Device Name:</td>
@@ -24,19 +24,20 @@
         </tr>
         <tr>
             <td>Location:</td>
-            <td>{{ $data['location'] }}</td>
+            <td>{{ $data['location'] }} &rsaquo; {{ $data['hub'] }} &rsaquo; {{ $data['area'] }}</td>
         </tr>
         <tr>
-            <td>Alert Type:</td>
-            <td>{{ ucfirst($alert->type->value) }}</td>
+            <td>Sensor:</td>
+            {{-- FIX: was $alert->type->value — Alert has no 'type' column in sensor-centric design --}}
+            <td>{{ $alert->sensor_label }}</td>
         </tr>
         <tr>
             <td>Current Value:</td>
-            <td><strong>{{ $data['value'] }}</strong></td>
+            <td><strong>{{ number_format($data['value'], 2) }} {{ $alert->sensor_unit }}</strong></td>
         </tr>
         <tr>
-            <td>Threshold:</td>
-            <td>{{ $data['threshold'] }}</td>
+            <td>Threshold Breached:</td>
+            <td>{{ $data['threshold'] }} {{ $alert->sensor_unit }} ({{ str_replace('_', ' ', $data['threshold_key']) }})</td>
         </tr>
         <tr>
             <td>Alert Time:</td>
@@ -50,7 +51,7 @@
         @if($alert->severity->value === 'critical')
             ⚠️ This is a CRITICAL alert. Immediate action is required.
         @else
-            ⚠️ This alert requires your attention.
+            ⚠️ This warning alert requires your attention.
         @endif
     </p>
 

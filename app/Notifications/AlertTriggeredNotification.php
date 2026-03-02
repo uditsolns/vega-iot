@@ -20,15 +20,20 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public readonly int    $alertId,
-        public readonly int    $deviceId,
-        public readonly string $severity,
-        public readonly string $sensorType,
-        public readonly float  $triggerValue,
-        public readonly string $reason,
-        public readonly string $startedAt,
-        public readonly string $event = 'triggered',
-    ) {}
+        public readonly int     $alertId,
+        public readonly int     $deviceId,
+        public readonly string  $severity,
+        public readonly string  $sensorType,
+        public readonly string  $sensorLabel,
+        public readonly float   $triggerValue,
+        public readonly float   $thresholdValue,
+        public readonly string  $thresholdKey,
+        public readonly string  $reason,
+        public readonly string  $startedAt,
+        public readonly string  $event = 'triggered',
+    ) {
+        $this->onQueue(config('notifications.queue', 'notifications'));
+    }
 
     // ─── Channels ─────────────────────────────────────────────────────────────
 
@@ -62,12 +67,9 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
         return $channels;
     }
 
-    /**
-     * Get the SMS representation
-     */
     public function toMsgClubSms($notifiable): MsgClubSmsMessage
     {
-        $device = Device::find($this->deviceId);
+        $device = Device::with('area.hub.location')->find($this->deviceId);
 
         return (new MsgClubSmsMessage)
             ->template('alert_triggered')
@@ -75,7 +77,9 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
                 'severity'    => ucfirst($this->severity),
                 'code'        => $device->device_code,
                 'device_code' => $device->device_code,
+                'sensor'      => $this->sensorLabel,
                 'value'       => number_format($this->triggerValue, 1),
+                'threshold'   => number_format($this->thresholdValue, 1),
                 'location'    => $this->resolveLocationPath($device),
                 'area'        => $device->area?->name ?? 'N/A',
             ]);
@@ -84,7 +88,10 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
     public function toMsgClubEmail($notifiable): MsgClubEmailMessage
     {
         $device = Device::with(['area.hub.location'])->find($this->deviceId);
-        $alert  = Alert::with(['deviceSensor.currentConfiguration'])->find($this->alertId);
+        $alert  = Alert::with([
+            'deviceSensor.sensorType',
+            'deviceSensor.currentConfiguration',
+        ])->find($this->alertId);
 
         return (new MsgClubEmailMessage)
             ->subject(ucfirst($this->severity) . " Alert: Device {$device->device_code}")
@@ -99,7 +106,7 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
 
     public function toMsgClubVoice($notifiable): MsgClubVoiceMessage
     {
-        $device = Device::find($this->deviceId);
+        $device = Device::with('area.hub.location')->find($this->deviceId);
 
         return (new MsgClubVoiceMessage)
             ->template('alert_triggered')
@@ -116,17 +123,20 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
         $device = Device::with('area.hub.location')->find($this->deviceId);
 
         return [
-            'alert_id'     => $this->alertId,
-            'device_id'    => $this->deviceId,
-            'device_code'  => $device->device_code,
-            'device_name'  => $device->device_name ?? $device->device_code,
-            'severity'     => $this->severity,
-            'sensor_type'  => $this->sensorType,
-            'trigger_value' => $this->triggerValue,
-            'reason'       => $this->reason,
-            'location'     => $this->resolveLocationPath($device),
-            'started_at'   => $this->startedAt,
-            'event'        => $this->event,
+            'alert_id'        => $this->alertId,
+            'device_id'       => $this->deviceId,
+            'device_code'     => $device->device_code,
+            'device_name'     => $device->device_name ?? $device->device_code,
+            'severity'        => $this->severity,
+            'sensor_type'     => $this->sensorType,
+            'sensor_label'    => $this->sensorLabel,
+            'trigger_value'   => $this->triggerValue,
+            'threshold_value' => $this->thresholdValue,
+            'threshold_key'   => $this->thresholdKey,
+            'reason'          => $this->reason,
+            'location'        => $this->resolveLocationPath($device),
+            'started_at'      => $this->startedAt,
+            'event'           => $this->event,
         ];
     }
 
@@ -134,27 +144,22 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
 
     private function buildTemplateData(Device $device, ?Alert $alert): array
     {
-        $area = $device->area;
-
-        // Threshold value comes from SensorConfiguration, not DeviceConfiguration
-        $sensorConfig  = $alert?->deviceSensor?->currentConfiguration;
-        $thresholdKey  = $alert?->threshold_breached;                       // e.g. 'max_critical'
-        $thresholdVal  = $sensorConfig && $thresholdKey
-            ? $sensorConfig->{$thresholdKey}
-            : null;
+        $area        = $device->area;
+        $sensorConfig = $alert?->deviceSensor?->currentConfiguration;
 
         return [
             'severity'       => $this->severity,
             'code'           => $device->device_code,
             'device_code'    => $device->device_code,
             'device_name'    => $device->device_name ?? $device->device_code,
-            'location'       => $area?->hub?->location?->name  ?? 'N/A',
-            'hub'            => $area?->hub?->name             ?? 'N/A',
-            'area'           => $area?->name                   ?? 'N/A',
-            'value'          => $this->triggerValue,
-            'threshold'      => $thresholdVal                  ?? 'N/A',
-            'threshold_type' => $thresholdKey                  ?? 'N/A',
+            'location'       => $area?->hub?->location?->name ?? 'N/A',
+            'hub'            => $area?->hub?->name           ?? 'N/A',
+            'area'           => $area?->name                 ?? 'N/A',
+            'sensor_label'   => $this->sensorLabel,
             'sensor_type'    => $this->sensorType,
+            'value'          => $this->triggerValue,
+            'threshold'      => $this->thresholdValue,
+            'threshold_key'  => $this->thresholdKey,
             'datetime'       => $this->startedAt,
             'alert_message'  => $this->reason,
         ];
@@ -169,8 +174,8 @@ class AlertTriggeredNotification extends Notification implements ShouldQueue
         $area->loadMissing('hub.location');
 
         return implode(' > ', array_filter([
-            $area->hub->location->name ?? null,
-            $area->hub->name           ?? null,
+            $area->hub?->location?->name ?? null,
+            $area->hub?->name            ?? null,
             $area->name,
         ]));
     }

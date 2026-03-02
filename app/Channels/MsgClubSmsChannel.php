@@ -2,8 +2,7 @@
 
 namespace App\Channels;
 
-use App\Notifications\Messages\MsgClubSmsMessage;
-use App\Services\Notification\Providers\MsgClubProvider;
+use App\Providers\MsgClubProvider;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
@@ -20,9 +19,9 @@ class MsgClubSmsChannel
     {
         // Get phone number from notifiable
         if (!$phone = $notifiable->routeNotificationFor('msgclub_sms', $notification)) {
-            Log::warning('No phone number for SMS notification', [
+            Log::warning('[MsgClubSms] No phone number on notifiable', [
                 'notifiable_id' => $notifiable->id,
-                'notification' => get_class($notification),
+                'notification'  => get_class($notification),
             ]);
             return;
         }
@@ -32,20 +31,14 @@ class MsgClubSmsChannel
 
         // Send via provider
         $response = $this->provider->sendSms(
-            mobile: $phone,
-            message: $message->content,
-            templateId: $message->templateId
+            mobile:     $phone,
+            message:    $message->content,
+            templateId: $message->templateId,
         );
 
         // Throw exception on failure (will trigger retry)
         if (!$response['success']) {
-            throw new \Exception($response['error'] ?? 'SMS sending failed');
+            throw new \Exception("[MsgClubSms] {$response['error']}");
         }
-
-        Log::info('SMS notification sent', [
-            'notifiable_id' => $notifiable->id,
-            'phone' => $phone,
-            'reference' => $response['reference'] ?? null,
-        ]);
     }
 }

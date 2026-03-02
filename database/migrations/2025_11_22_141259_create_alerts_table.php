@@ -33,7 +33,6 @@ return new class extends Migration {
             $table->foreignId('resolved_by')->nullable()->constrained('users')->onDelete('set null');
             $table->text('resolve_comment')->nullable();
 
-            $table->boolean('is_back_in_range')->default(false);
             $table->timestampTz('last_notification_at')->nullable();
             $table->integer('notification_count')->default(0);
 

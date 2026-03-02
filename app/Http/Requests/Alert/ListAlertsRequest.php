@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Alert;
 
-use App\Enums\AlertSensorType;
 use App\Enums\AlertSeverity;
 use App\Enums\AlertStatus;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,7 +27,6 @@ class ListAlertsRequest extends FormRequest
         return [
             'status' => ['nullable', Rule::in(AlertStatus::values())],
             'severity' => ['nullable', Rule::in(AlertSeverity::values())],
-            'type' => ['nullable', Rule::in(AlertSensorType::values())],
             'device_id' => ['nullable', 'integer', 'exists:devices,id'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'filter' => ['nullable', 'array'],

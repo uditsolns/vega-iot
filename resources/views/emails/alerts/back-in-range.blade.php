@@ -16,7 +16,7 @@
     <table class="info-table">
         <tr>
             <td>Device Code:</td>
-            <td>{{ $device->device_code }}</td>
+            <td><strong>{{ $device->device_code }}</strong></td>
         </tr>
         <tr>
             <td>Device Name:</td>
@@ -24,11 +24,12 @@
         </tr>
         <tr>
             <td>Location:</td>
-            <td>{{ $data['location'] }}</td>
+            <td>{{ $data['location'] }} &rsaquo; {{ $data['hub'] }} &rsaquo; {{ $data['area'] }}</td>
         </tr>
         <tr>
-            <td>Alert Type:</td>
-            <td>{{ ucfirst($alert->type->value) }}</td>
+            <td>Sensor:</td>
+            {{-- FIX: was $alert->type->value — Alert has no 'type' column in sensor-centric design --}}
+            <td>{{ $alert->sensor_label }}</td>
         </tr>
         <tr>
             <td>Alert Started:</td>
@@ -44,7 +45,7 @@
         </tr>
         <tr>
             <td>Current Value:</td>
-            <td>{{ $data['value'] }}</td>
+            <td>{{ number_format($data['value'], 2) }} {{ $alert->sensor_unit }}</td>
         </tr>
     </table>
 

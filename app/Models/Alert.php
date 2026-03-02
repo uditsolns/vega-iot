@@ -7,7 +7,6 @@ use App\Enums\AlertStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Alert extends Model
 {
@@ -30,7 +29,6 @@ class Alert extends Model
         'resolved_at',
         'resolved_by',
         'resolve_comment',
-        'is_back_in_range',
         'last_notification_at',
         'notification_count',
     ];
@@ -38,16 +36,15 @@ class Alert extends Model
     protected function casts(): array
     {
         return [
-            'severity' => AlertSeverity::class,
-            'status' => AlertStatus::class,
-            'trigger_value' => 'decimal:2',
-            'is_back_in_range' => 'boolean',
-            'started_at' => 'datetime',
-            'ended_at' => 'datetime',
-            'acknowledged_at' => 'datetime',
-            'resolved_at' => 'datetime',
+            'severity'             => AlertSeverity::class,
+            'status'               => AlertStatus::class,
+            'trigger_value'        => 'decimal:2',
+            'started_at'           => 'datetime',
+            'ended_at'             => 'datetime',
+            'acknowledged_at'      => 'datetime',
+            'resolved_at'          => 'datetime',
             'last_notification_at' => 'datetime',
-            'created_at' => 'datetime',
+            'created_at'           => 'datetime',
         ];
     }
 
@@ -73,11 +70,6 @@ class Alert extends Model
     public function resolvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resolved_by');
-    }
-
-    public function notifications(): HasMany
-    {
-        return $this->hasMany(AlertNotification::class);
     }
 
     // ========================================
@@ -142,14 +134,14 @@ class Alert extends Model
         }
 
         return $this->update([
-            'status' => AlertStatus::Acknowledged,
-            'acknowledged_at' => now(),
-            'acknowledged_by' => $user->id,
+            'status'              => AlertStatus::Acknowledged,
+            'acknowledged_at'     => now(),
+            'acknowledged_by'     => $user->id,
             'acknowledge_comment' => $comment,
         ]);
     }
 
-    public function resolve(User $user, ?string $comment = null, bool $isBackInRange = false): bool
+    public function resolve(User $user, ?string $comment = null): bool
     {
         if (!in_array($this->status, [AlertStatus::Active, AlertStatus::Acknowledged])) {
             return false;
@@ -158,13 +150,12 @@ class Alert extends Model
         $endedAt = now();
 
         return $this->update([
-            'status' => AlertStatus::Resolved,
-            'resolved_at' => $endedAt,
-            'resolved_by' => $user->id,
-            'resolve_comment' => $comment,
-            'ended_at' => $endedAt,
-            'duration_seconds' => $this->started_at->diffInSeconds($endedAt),
-            'is_back_in_range' => $isBackInRange,
+            'status'           => AlertStatus::Resolved,
+            'resolved_at'      => $endedAt,
+            'resolved_by'      => $user->id,
+            'resolve_comment'  => $comment,
+            'ended_at'         => $endedAt,
+            'duration_seconds' => (int) $this->started_at->diffInSeconds($endedAt),
         ]);
     }
 
@@ -177,10 +168,9 @@ class Alert extends Model
         $endedAt = now();
 
         return $this->update([
-            'status' => AlertStatus::AutoResolved,
-            'ended_at' => $endedAt,
-            'duration_seconds' => $this->started_at->diffInSeconds($endedAt),
-            'is_back_in_range' => true,
+            'status'           => AlertStatus::AutoResolved,
+            'ended_at'         => $endedAt,
+            'duration_seconds' => (int) $this->started_at->diffInSeconds($endedAt),
         ]);
     }
 
@@ -194,13 +184,39 @@ class Alert extends Model
     // ACCESSORS
     // ========================================
 
+    /**
+     * Human-readable sensor type name for use in templates/notifications.
+     * Replaces the old $alert->type->value pattern (which referenced the deleted AlertSensorType enum).
+     */
+    public function getSensorTypeNameAttribute(): string
+    {
+        return $this->deviceSensor?->sensorType?->name ?? 'unknown';
+    }
+
+    /**
+     * Human-readable sensor label (custom label if set, otherwise type name).
+     */
+    public function getSensorLabelAttribute(): string
+    {
+        $sensor = $this->deviceSensor;
+        return $sensor?->label ?? $sensor?->sensorType?->name ?? 'Unknown Sensor';
+    }
+
+    /**
+     * Sensor unit for display (°C, %, ppm, etc.).
+     */
+    public function getSensorUnitAttribute(): ?string
+    {
+        return $this->deviceSensor?->sensorType?->unit;
+    }
+
     public function getDurationFormattedAttribute(): ?string
     {
         if (!$this->duration_seconds) {
             return null;
         }
 
-        $hours = intdiv($this->duration_seconds, 3600);
+        $hours   = intdiv($this->duration_seconds, 3600);
         $minutes = intdiv($this->duration_seconds % 3600, 60);
         $seconds = $this->duration_seconds % 60;
 

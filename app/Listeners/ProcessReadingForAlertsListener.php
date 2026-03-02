@@ -25,6 +25,8 @@ class ProcessReadingForAlertsListener implements ShouldQueue
     public function handle(ReadingReceived $event): void
     {
         try {
+            Log::debug("Device reading processing: ", $event->sensorReadings);
+
             $device = Device::with([
                 'sensors.sensorType',
                 'sensors.currentConfiguration',

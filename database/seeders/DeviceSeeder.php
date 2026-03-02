@@ -88,27 +88,27 @@ class DeviceSeeder extends Seeder
     }
 
     private function createDevice(
-        string $uid,
-        string $code,
-        int $modelId,
-        ?int $companyId = null,
-        ?int $areaId = null,
-        ?string $name = null,
-        string $status = 'offline',
+        string  $uid,
+        string  $code,
+        int     $modelId,
+        ?int    $companyId = null,
+        ?int    $areaId    = null,
+        ?string $name      = null,
+        string  $status    = 'offline',
     ): int {
         return DB::table('devices')->insertGetId([
-            'device_uid' => strtoupper(implode(':', str_split(str_pad(md5($uid), 12, '0'), 2))),
-            'device_code' => $code,
+            'device_uid'      => strtolower(substr(md5($uid), 0, 12)),
+            'device_code'     => $code,
             'device_model_id' => $modelId,
             'firmware_version' => 'v1.0.0',
-            'company_id' => $companyId,
-            'area_id' => $areaId,
-            'device_name' => $name,
-            'status' => $status,
-            'is_active' => true,
+            'company_id'      => $companyId,
+            'area_id'         => $areaId,
+            'device_name'     => $name,
+            'status'          => $status,
+            'is_active'       => true,
             'last_reading_at' => $status === 'online' ? now()->subMinutes(5) : null,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_at'      => now(),
+            'updated_at'      => now(),
         ]);
     }
 
@@ -120,16 +120,16 @@ class DeviceSeeder extends Seeder
 
         foreach ($slots as $slot) {
             DB::table('device_sensors')->insert([
-                'device_id' => $deviceId,
-                'slot_number' => $slot->slot_number,
-                'sensor_type_id' => $slot->fixed_sensor_type_id,
-                'is_enabled' => true,
-                'label' => $slot->label,
-                'accuracy' => $slot->accuracy,
-                'resolution' => $slot->resolution,
+                'device_id'        => $deviceId,
+                'slot_number'      => $slot->slot_number,
+                'sensor_type_id'   => $slot->fixed_sensor_type_id,
+                'is_enabled'       => true,
+                'label'            => $slot->label,
+                'accuracy'         => $slot->accuracy,
+                'resolution'       => $slot->resolution,
                 'measurement_range' => $slot->measurement_range,
-                'created_by' => null,
-                'created_at' => now(),
+                'created_by'       => null,
+                'created_at'       => now(),
             ]);
         }
 
@@ -139,24 +139,24 @@ class DeviceSeeder extends Seeder
     private function createSunsuiSensors(int $deviceId): void
     {
         $assignments = [
-            ['slot_number' => 1, 'sensor_type_id' => 1, 'label' => 'Temp'],
-            ['slot_number' => 2, 'sensor_type_id' => 2, 'label' => 'Humidity'],
-            ['slot_number' => 3, 'sensor_type_id' => 6, 'label' => 'Air Quality'],
-            ['slot_number' => 4, 'sensor_type_id' => 7, 'label' => 'Sound', 'is_enabled' => false],
+            ['slot_number' => 1, 'sensor_type_id' => 1, 'label' => 'Temp',        'is_enabled' => true],
+            ['slot_number' => 2, 'sensor_type_id' => 2, 'label' => 'Humidity',    'is_enabled' => true],
+            ['slot_number' => 3, 'sensor_type_id' => 6, 'label' => 'Air Quality', 'is_enabled' => true],
+            ['slot_number' => 4, 'sensor_type_id' => 7, 'label' => 'Sound',       'is_enabled' => false],
         ];
 
         foreach ($assignments as $a) {
             DB::table('device_sensors')->insert([
-                'device_id' => $deviceId,
-                'slot_number' => $a['slot_number'],
-                'sensor_type_id' => $a['sensor_type_id'],
-                'is_enabled' => $a['is_enabled'] ?? true,
-                'label' => $a['label'],
-                'accuracy' => null,
-                'resolution' => null,
+                'device_id'        => $deviceId,
+                'slot_number'      => $a['slot_number'],
+                'sensor_type_id'   => $a['sensor_type_id'],
+                'is_enabled'       => $a['is_enabled'],
+                'label'            => $a['label'],
+                'accuracy'         => null,
+                'resolution'       => null,
                 'measurement_range' => null,
-                'created_by' => null,
-                'created_at' => now(),
+                'created_by'       => null,
+                'created_at'       => now(),
             ]);
         }
 
@@ -175,20 +175,20 @@ class DeviceSeeder extends Seeder
 
         foreach ($sensors as $sensor) {
             $thresholds = match ($sensor->type_name) {
-                'temperature' => ['min_critical' => 0, 'max_critical' => 35, 'min_warning' => 5, 'max_warning' => 30],
-                'humidity' => ['min_critical' => 30, 'max_critical' => 90, 'min_warning' => 40, 'max_warning' => 80],
+                'temperature' => ['min_critical' => 0,    'max_critical' => 35,   'min_warning' => 5,    'max_warning' => 30],
+                'humidity'    => ['min_critical' => 30,   'max_critical' => 90,   'min_warning' => 40,   'max_warning' => 80],
                 'air_quality' => ['min_critical' => null, 'max_critical' => 1000, 'min_warning' => null, 'max_warning' => 600],
-                'sound' => ['min_critical' => null, 'max_critical' => 90, 'min_warning' => null, 'max_warning' => 70],
-                default => ['min_critical' => null, 'max_critical' => null, 'min_warning' => null, 'max_warning' => null],
+                'sound'       => ['min_critical' => null, 'max_critical' => 90,   'min_warning' => null, 'max_warning' => 70],
+                default       => ['min_critical' => null, 'max_critical' => null, 'min_warning' => null, 'max_warning' => null],
             };
 
             DB::table('sensor_configurations')->insert([
                 ...$thresholds,
                 'device_sensor_id' => $sensor->id,
-                'effective_from' => now(),
-                'effective_to' => null,
-                'updated_by' => null,
-                'created_at' => now(),
+                'effective_from'   => now(),
+                'effective_to'     => null,
+                'updated_by'       => null,
+                'created_at'       => now(),
             ]);
         }
     }
@@ -196,18 +196,18 @@ class DeviceSeeder extends Seeder
     private function createDefaultConfig(int $deviceId): void
     {
         DB::table('device_configurations')->insert([
-            'device_id' => $deviceId,
-            'recording_interval' => 5,
-            'sending_interval' => 5,
-            'wifi_ssid' => null,
-            'wifi_password' => null,
-            'wifi_mode' => 'WPA2',
+            'device_id'               => $deviceId,
+            'recording_interval'      => 5,
+            'sending_interval'        => 5,
+            'wifi_ssid'               => null,
+            'wifi_password'           => null,
+            'wifi_mode'               => 'WPA2',
             'timezone_offset_minutes' => 330,
-            'effective_from' => now(),
-            'effective_to' => null,
-            'last_synced_at' => null,
-            'updated_by' => null,
-            'created_at' => now(),
+            'effective_from'          => now(),
+            'effective_to'            => null,
+            'last_synced_at'          => null,
+            'updated_by'              => null,
+            'created_at'              => now(),
         ]);
     }
 }
