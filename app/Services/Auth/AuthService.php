@@ -22,8 +22,6 @@ class AuthService
      */
     public function login(array $credentials): array
     {
-        Log::debug("Credentials: ", $credentials);
-
         // Attempt authentication using Auth facade
         if (
             !Auth::attempt([

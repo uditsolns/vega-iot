@@ -48,12 +48,9 @@ class DeviceResource extends JsonResource
                 ] : null,
             ] : null),
 
-            'sensors' => $this->whenLoaded('sensors', DeviceSensorResource::collection($this->sensors)
-            ),
+            'sensors' => DeviceSensorResource::collection($this->whenLoaded('sensors')),
 
-            'current_configuration' => $this->whenLoaded('currentConfiguration', fn() =>
-                $this->currentConfiguration ? new DeviceConfigurationResource($this->currentConfiguration) : null
-            ),
+            'current_configuration' => new DeviceConfigurationResource($this->whenLoaded('currentConfiguration')),
 
             'created_at' => $this->created_at->toISOString(),
             'updated_at' => $this->updated_at->toISOString(),

@@ -16,7 +16,6 @@ class ReportResource extends JsonResource
             'name' => $this->name,
             'file_type' => $this->file_type,
             'format' => $this->format,
-            'data_formation' => $this->data_formation,
             'interval' => $this->interval,
             'from_datetime' => $this->from_datetime,
             'to_datetime' => $this->to_datetime,
@@ -26,6 +25,7 @@ class ReportResource extends JsonResource
             'device_id' => $this->device_id,
             'generated_by' => $this->generated_by,
 
+            'sensor_ids' => $this->sensor_ids,
             'company' => new CompanyResource($this->whenLoaded('company')),
             'device' => new DeviceResource($this->whenLoaded('device')),
             'generated_by_user' => new UserResource($this->whenLoaded('generatedBy')),

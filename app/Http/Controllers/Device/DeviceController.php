@@ -36,7 +36,7 @@ class DeviceController extends Controller
     public function show(Device $device): JsonResponse
     {
         $this->authorize('view', $device);
-        $device->load(['deviceModel', 'company', 'area.hub.location', 'sensors.sensorType', 'sensors.currentConfiguration', 'currentConfiguration']);
+        $device->load($this->deviceService->showIncludes());
         return $this->success(new DeviceResource($device));
     }
 

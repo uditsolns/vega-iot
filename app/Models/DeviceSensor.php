@@ -43,6 +43,14 @@ class DeviceSensor extends Model
         return $this->belongsTo(SensorType::class);
     }
 
+    /**
+     * Latest sensor reading for the sensor.
+     */
+    public function latestReading(): HasOne
+    {
+        return $this->hasOne(SensorReading::class, 'device_sensor_id')->latestOfMany('recorded_at');
+    }
+
     public function configurations(): HasMany
     {
         return $this->hasMany(SensorConfiguration::class)->orderByDesc('effective_from');

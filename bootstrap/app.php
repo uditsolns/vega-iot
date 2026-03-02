@@ -22,8 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . "/../routes/console.php",
         health: "/up",
         then: function () {
-            Route::middleware('api')
-                ->prefix('gateway')
+            Route::prefix('gateway')
                 ->group(base_path('routes/gateway.php'));
          },
     )
@@ -42,18 +41,18 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             // Log the full error for debugging (server-side only)
-            if (app()->bound("log")) {
-                \Log::error("API Exception: " . $e->getMessage(), [
-                    "exception" => get_class($e),
-                    "file" => $e->getFile(),
-                    "line" => $e->getLine(),
-                    "trace" => $e->getTraceAsString(),
-                    "url" => $request->fullUrl(),
-                    "method" => $request->method(),
-                    "ip" => $request->ip(),
-                    "user_id" => $request->user()?->id,
-                ]);
-            }
+//            if (app()->bound("log")) {
+//                \Log::error("API Exception: " . $e->getMessage(), [
+//                    "exception" => get_class($e),
+//                    "file" => $e->getFile(),
+//                    "line" => $e->getLine(),
+//                    "trace" => $e->getTraceAsString(),
+//                    "url" => $request->fullUrl(),
+//                    "method" => $request->method(),
+//                    "ip" => $request->ip(),
+//                    "user_id" => $request->user()?->id,
+//                ]);
+//            }
 
             // Handle specific exception types
             // 1. Validation Exceptions (422)

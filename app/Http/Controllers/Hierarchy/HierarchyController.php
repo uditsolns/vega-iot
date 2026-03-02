@@ -19,7 +19,6 @@ use Illuminate\Http\Request;
 class HierarchyController extends Controller
 {
     public function __construct(
-        private readonly LocationService $locationService,
         private readonly HierarchyService $hierarchyService,
     ) {}
 
@@ -42,10 +41,7 @@ class HierarchyController extends Controller
     {
         $this->authorize("viewAny", Location::class);
 
-        $locations = $this->locationService->list(
-            $request->all(),
-            $request->user(),
-        );
+        $locations = $this->hierarchyService->getLocations($request->user());
 
         return $this->collection(LocationResource::collection($locations));
     }

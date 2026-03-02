@@ -26,9 +26,8 @@ class DeviceSensorResource extends JsonResource
                 'data_type' => $this->sensorType->data_type->value,
                 'supports_threshold_config' => $this->sensorType->supports_threshold_config,
             ]),
-            'current_configuration' => $this->whenLoaded('currentConfiguration', fn() =>
-            $this->currentConfiguration ? new SensorConfigurationResource($this->currentConfiguration) : null
-            ),
+            'current_configuration' => new SensorConfigurationResource($this->whenLoaded('currentConfiguration')),
+            'latest_reading' => new SensorReadingResource($this->whenLoaded('latestReading')),
         ];
     }
 }

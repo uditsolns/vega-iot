@@ -25,6 +25,11 @@ class HierarchyService
             ->get();
     }
 
+    public function getLocations(User $user): Collection
+    {
+        return Location::forUser($user)->get();
+    }
+
     /**
      * Get hubs for a specific location
      *

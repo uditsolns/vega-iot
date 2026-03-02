@@ -39,16 +39,22 @@ readonly class DeviceService
                 AllowedFilter::scope('deployed'),
             ])
             ->allowedSorts(['device_name', 'device_code', 'created_at', 'status', 'last_reading_at'])
-            ->allowedIncludes([
-                'deviceModel',
-                'area.hub.location',
-                'company',
-                'currentConfiguration',
-                'sensors.sensorType',
-                'sensors.currentConfiguration',
-            ])
+            ->allowedIncludes($this->showIncludes())
+            ->with(['sensors', 'sensors.sensorType', 'sensors.latestReading'])
             ->defaultSort('-created_at')
             ->paginate($filters['per_page'] ?? 20);
+    }
+
+    public function showIncludes(): array {
+        return [
+            'deviceModel',
+            'company',
+            'area.hub.location',
+            'sensors.sensorType',
+            'sensors.currentConfiguration',
+            'sensors.latestReading',
+            'currentConfiguration'
+        ];
     }
 
     public function create(array $data, ?User $createdBy = null): Device
@@ -76,7 +82,7 @@ readonly class DeviceService
 
     public function update(Device $device, array $data): Device
     {
-        $device->update(\Arr::only($data, ['device_name', 'firmware_version', 'is_active', 'status']));
+        $device->update(\Arr::only($data, ['device_uid', 'device_name', 'firmware_version', 'is_active', 'status']));
         return $device->fresh(['deviceModel', 'currentConfiguration']);
     }
 

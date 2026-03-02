@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\ProfileController;
 use App\Http\Controllers\CalibrationInstrumentController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Device\DeviceConfigurationController;
 use App\Http\Controllers\Device\DeviceController;
 use App\Http\Controllers\Device\DeviceModelController;
@@ -58,6 +59,18 @@ Route::prefix("v1")->group(function () {
                     Route::put("/", "update");
                     Route::patch("password", "changePassword");
                 });
+            });
+
+        Route::prefix("dashboard")
+            ->controller(DashboardController::class)
+            ->group(function () {
+                Route::get("overview", "overview");
+                Route::get("device-status", "deviceStatus");
+                Route::get("active-alerts", "activeAlerts");
+                Route::get("recent-activity", "recentActivity");
+                Route::get("temperature-trends", "temperatureTrends");
+                Route::get("alert-trends", "alertTrends");
+                Route::get("top-devices-by-alerts", "topDevicesByAlerts");
             });
 
         // Companies
