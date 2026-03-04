@@ -41,7 +41,7 @@ readonly class DeviceService
             ->allowedSorts(['device_name', 'device_code', 'created_at', 'status', 'last_reading_at'])
             ->allowedIncludes($this->showIncludes())
             ->with(['sensors', 'sensors.sensorType', 'sensors.latestReading'])
-            ->defaultSort('-created_at')
+            ->defaultSort('-last_reading_at')
             ->paginate($filters['per_page'] ?? 20);
     }
 
@@ -53,7 +53,8 @@ readonly class DeviceService
             'sensors.sensorType',
             'sensors.currentConfiguration',
             'sensors.latestReading',
-            'currentConfiguration'
+            'currentConfiguration',
+            'assignedBy',
         ];
     }
 
@@ -86,6 +87,28 @@ readonly class DeviceService
         return $device->fresh(['deviceModel', 'currentConfiguration']);
     }
 
+    public function updateAssetInfo(Device $device, array $data): Device
+    {
+        $device->update(\Arr::only($data, [
+            'device_name',
+            'installation_date',
+            'subscription_start_date',
+            'subscription_end_date',
+            'warranty_start_date',
+            'warranty_end_date',
+            'calibration_start_date',
+            'calibration_end_date',
+        ]));
+
+        return $device->fresh();
+    }
+
+    public function updateCalibrationInfo(Device $device, array $data): Device
+    {
+        $device->update(\Arr::only($data, ['calibration_start_date', 'calibration_end_date']));
+        return $device->fresh();
+    }
+
     public function delete(Device $device): void
     {
         $device->update(['is_active' => false]);
@@ -106,7 +129,7 @@ readonly class DeviceService
         return $device->fresh();
     }
 
-    public function assignToCompany(Device $device, array $data): Device
+    public function assignToCompany(Device $device, array $data, User $user): Device
     {
         $company = Company::findOrFail($data['company_id']);
 
@@ -114,6 +137,8 @@ readonly class DeviceService
             'company_id' => $company->id,
             'area_id' => null,
             'device_name' => $data['device_name'] ?? $device->device_name,
+            'assigned_at' => now(),
+            'assigned_by' => $user->id,
         ]);
 
         activity('device')->event('assigned_to_company')

@@ -8,6 +8,8 @@ use App\Http\Requests\Device\AssignDeviceToAreaRequest;
 use App\Http\Requests\Device\AssignDeviceToCompanyRequest;
 use App\Http\Requests\Device\ChangeStatusRequest;
 use App\Http\Requests\Device\CreateDeviceRequest;
+use App\Http\Requests\Device\UpdateDeviceAssetInfoRequest;
+use App\Http\Requests\Device\UpdateDeviceCalibrationInfoRequest;
 use App\Http\Requests\Device\UpdateDeviceRequest;
 use App\Http\Resources\DeviceResource;
 use App\Models\Device;
@@ -47,6 +49,20 @@ class DeviceController extends Controller
         return $this->success(new DeviceResource($device), 'Device updated successfully');
     }
 
+    public function updateAssetInfo(UpdateDeviceAssetInfoRequest $request, Device $device): JsonResponse
+    {
+        $this->authorize('update-asset-info', $device);
+        $device = $this->deviceService->updateAssetInfo($device, $request->validated());
+        return $this->success(new DeviceResource($device), 'Device asset info updated successfully');
+    }
+
+    public function updateCalibrationInfo(UpdateDeviceCalibrationInfoRequest $request, Device $device): JsonResponse
+    {
+        $this->authorize('update-calibration-info', $device);
+        $device = $this->deviceService->updateCalibrationInfo($device, $request->validated());
+        return $this->success(new DeviceResource($device), 'Device calibration info updated successfully');
+    }
+
     public function destroy(Device $device): JsonResponse
     {
         $this->authorize('delete', $device);
@@ -64,7 +80,7 @@ class DeviceController extends Controller
     public function assignToCompany(AssignDeviceToCompanyRequest $request, Device $device): JsonResponse
     {
         $this->authorize('assignToCompany', $device);
-        $device = $this->deviceService->assignToCompany($device, $request->validated());
+        $device = $this->deviceService->assignToCompany($device, $request->validated(), $request->user());
         return $this->success(new DeviceResource($device), 'Device assigned to company successfully');
     }
 

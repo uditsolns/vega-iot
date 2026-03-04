@@ -10,6 +10,7 @@ class CreateCalibrationInstrumentRequest extends FormRequest
     {
         return [
             'company_id' => ['required', 'exists:companies,id'],
+            'company_name' => ['required', 'string', 'max:255'],
             'instrument_name' => ['required', 'string', 'max:255'],
             'instrument_code' => ['nullable', 'string', 'max:100', 'unique:calibration_instruments,instrument_code'],
             'serial_number' => ['nullable', 'string', 'max:100'],

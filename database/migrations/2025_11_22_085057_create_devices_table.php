@@ -23,6 +23,17 @@ return new class extends Migration {
             $table->boolean('is_active')->default(true);
             $table->timestampTz('last_reading_at')->nullable();
 
+            $table->timestampTz('assigned_at')->nullable();
+            $table->foreignId('assigned_by')->nullable()->constrained('users')->onDelete('set null');
+
+            $table->date('installation_date')->nullable();
+            $table->date('subscription_start_date')->nullable();
+            $table->date('subscription_end_date')->nullable();
+            $table->date('warranty_start_date')->nullable();
+            $table->date('warranty_end_date')->nullable();
+            $table->date('calibration_start_date')->nullable();
+            $table->date('calibration_end_date')->nullable();
+
             $table->timestamps();
 
             $table->index('device_model_id', 'idx_devices_model');

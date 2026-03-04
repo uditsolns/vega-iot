@@ -216,6 +216,8 @@ Route::prefix("v1")->group(function () {
                 Route::post("{device}/assign-company", "assignToCompany");
                 Route::post("{device}/assign-area", "assignToArea");
                 Route::post("{device}/unassign", "unassign");
+                Route::patch("{device}/asset", "updateAssetInfo");
+                Route::patch("{device}/calibration", "updateCalibrationInfo");
             });
 
         // Device Configuration

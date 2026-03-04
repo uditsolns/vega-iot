@@ -13,6 +13,7 @@ class CalibrationInstrumentResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'company_name' => $this->company_name,
             'instrument_name' => $this->instrument_name,
             'instrument_code' => $this->instrument_code,
             'serial_no' => $this->serial_no,

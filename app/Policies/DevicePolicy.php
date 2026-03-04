@@ -53,6 +53,30 @@ class DevicePolicy
     }
 
     /**
+     *  Determine if the user can update device's asset info
+     */
+    public function updateAssetInfo(User $user, Device $device): bool
+    {
+        if (!$user->hasPermission("devices.update")) {
+            return false;
+        }
+
+        return $user->ofSystem();
+    }
+
+    /**
+     * Determine if the user can update device's calibration info
+     */
+    public function updateCalibrationInfo(User $user, Device $device): bool
+    {
+        if (!$user->hasPermission("devices.update")) {
+            return false;
+        }
+
+        return $this->userCanAccessDevice($user, $device);
+    }
+
+    /**
      * Determine if the user can delete a device.
      * Only super admins can delete devices.
      */

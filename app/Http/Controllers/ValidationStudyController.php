@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\ValidationStudyResource;
 use App\Models\ValidationStudy;
 use App\Services\Company\ValidationStudyService;
 use App\Http\Requests\ValidationStudy\CreateValidationStudyRequest;
@@ -24,7 +25,7 @@ class ValidationStudyController extends Controller
             $request->user()
         );
 
-        return $this->collection($studies);
+        return $this->collection(ValidationStudyResource::collection($studies));
     }
 
     public function store(CreateValidationStudyRequest $request): JsonResponse
@@ -33,14 +34,14 @@ class ValidationStudyController extends Controller
 
         $study = $this->service->create($request->validated());
 
-        return $this->created($study, 'Validation study created');
+        return $this->created(new ValidationStudyResource($study), 'Validation study created');
     }
 
     public function show(ValidationStudy $validationStudy): JsonResponse
     {
         $this->authorize('view', $validationStudy);
 
-        return $this->success($validationStudy);
+        return $this->success(new ValidationStudyResource($validationStudy));
     }
 
     public function update(
@@ -54,7 +55,7 @@ class ValidationStudyController extends Controller
             $request->validated()
         );
 
-        return $this->success($study, 'Validation study updated');
+        return $this->success(new ValidationStudyResource($study), 'Validation study updated');
     }
 
     public function destroy(ValidationStudy $validationStudy): JsonResponse

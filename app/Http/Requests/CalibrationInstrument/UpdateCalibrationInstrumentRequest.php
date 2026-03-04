@@ -12,6 +12,7 @@ class UpdateCalibrationInstrumentRequest extends FormRequest
         $instrument = $this->route('calibrationInstrument');
 
         return [
+            'company_name' => ['sometimes', 'string', 'max:255'],
             'instrument_name' => ['sometimes', 'required', 'string', 'max:255'],
             'instrument_code' => [
                 'sometimes',

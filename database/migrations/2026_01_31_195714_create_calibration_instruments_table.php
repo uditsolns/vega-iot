@@ -13,6 +13,7 @@ return new class extends Migration {
             $table->foreignId('company_id')->constrained('companies');
 
             // Instrument identity
+            $table->string('company_name')->nullable();
             $table->string('instrument_name')->nullable();
             $table->string('instrument_code')->nullable()->unique();
             $table->string('serial_no')->nullable();

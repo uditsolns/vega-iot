@@ -27,6 +27,15 @@ class Device extends Model
         'status',
         'is_active',
         'last_reading_at',
+        'assigned_at',
+        'assigned_by',
+        'installation_date',
+        'subscription_start_date',
+        'subscription_end_date',
+        'warranty_start_date',
+        'warranty_end_date',
+        'calibration_start_date',
+        'calibration_end_date',
     ];
 
     public function getActivitylogOptions(): LogOptions
@@ -46,6 +55,14 @@ class Device extends Model
             'status' => DeviceStatus::class,
             'is_active' => 'boolean',
             'last_reading_at' => 'datetime',
+            'assigned_at' => 'datetime',
+            'installation_date' => 'date',
+            'subscription_start_date' => 'date',
+            'subscription_end_date' => 'date',
+            'warranty_start_date' => 'date',
+            'warranty_end_date' => 'date',
+            'calibration_start_date' => 'date',
+            'calibration_end_date' => 'date',
         ];
     }
 
@@ -99,6 +116,11 @@ class Device extends Model
             ->where('status', \App\Enums\ConfigRequestStatus::Pending)
             ->orderByDesc('priority')
             ->orderBy('created_at');
+    }
+
+    public function assignedBy(): HasOne
+    {
+        return $this->hasOne(User::class, 'id', 'assigned_by');
     }
 
     // ========================================

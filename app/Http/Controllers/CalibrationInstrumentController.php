@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CalibrationInstrument\CreateCalibrationInstrumentRequest;
 use App\Http\Requests\CalibrationInstrument\UpdateCalibrationInstrumentRequest;
+use App\Http\Resources\CalibrationInstrumentResource;
 use App\Models\CalibrationInstrument;
 use App\Services\Company\CalibrationInstrumentService;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +22,7 @@ class CalibrationInstrumentController extends Controller
 
         $items = $this->service->list($request->all(), $request->user());
 
-        return $this->collection($items);
+        return $this->collection(CalibrationInstrumentResource::collection($items));
     }
 
     public function store(CreateCalibrationInstrumentRequest $request): JsonResponse
@@ -37,7 +38,7 @@ class CalibrationInstrumentController extends Controller
     {
         $this->authorize('view', $calibrationInstrument);
 
-        return $this->success($calibrationInstrument);
+        return $this->success(new CalibrationInstrumentResource($calibrationInstrument));
     }
 
     public function update(
@@ -51,7 +52,7 @@ class CalibrationInstrumentController extends Controller
             $request->validated()
         );
 
-        return $this->success($item, 'Calibration instrument updated');
+        return $this->success(new CalibrationInstrumentResource($item), 'Calibration instrument updated');
     }
 
     public function destroy(CalibrationInstrument $calibrationInstrument): JsonResponse

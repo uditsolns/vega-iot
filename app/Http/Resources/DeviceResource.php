@@ -51,7 +51,16 @@ class DeviceResource extends JsonResource
             'sensors' => DeviceSensorResource::collection($this->whenLoaded('sensors')),
 
             'current_configuration' => new DeviceConfigurationResource($this->whenLoaded('currentConfiguration')),
+            'assigned_by_user' => new UserResource($this->whenLoaded('assignedBy')),
 
+            'assigned_at' => $this->assigned_at?->toISOString(),
+            'installation_date' => $this->installation_date?->toISOString(),
+            'subscription_start_date' => $this->subscription_start_date?->toISOString(),
+            'subscription_end_date' => $this->subscription_end_date?->toISOString(),
+            'warranty_start_date' => $this->warranty_start_date?->toISOString(),
+            'warranty_end_date' => $this->warranty_end_date?->toISOString(),
+            'calibration_start_date' => $this->calibration_start_date?->toISOString(),
+            'calibration_end_date' => $this->calibration_end_date?->toISOString(),
             'created_at' => $this->created_at->toISOString(),
             'updated_at' => $this->updated_at->toISOString(),
         ];

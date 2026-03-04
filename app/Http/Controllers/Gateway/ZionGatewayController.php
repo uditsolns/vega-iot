@@ -34,12 +34,14 @@ class ZionGatewayController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
+        Log::info("Reading Received: ", $request->all());
+
         $deviceUid = $request->query('deviceUid')
             ?? $request->json('entity.data.deviceUid')
             ?? null;
 
         if (!$deviceUid) {
-            return response()->json(['success' => false, 'error' => 'Missing deviceUid'], 400);
+            return response()->json($this->adapter->buildSuccessResponse());
         }
 
         $device = Device::where('device_uid', $deviceUid)
