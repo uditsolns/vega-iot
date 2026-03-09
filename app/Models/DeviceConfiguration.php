@@ -36,7 +36,6 @@ class DeviceConfiguration extends Model
             'effective_from' => 'datetime',
             'effective_to' => 'datetime',
             'last_synced_at' => 'datetime',
-            'created_at' => 'datetime',
         ];
     }
 

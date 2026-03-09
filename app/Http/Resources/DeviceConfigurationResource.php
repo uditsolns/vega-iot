@@ -26,7 +26,6 @@ class DeviceConfigurationResource extends JsonResource
                 'id' => $this->updatedBy->id,
                 'name' => "{$this->updatedBy->first_name} {$this->updatedBy->last_name}",
             ] : null),
-            'created_at' => $this->created_at->toISOString(),
         ];
     }
 }

@@ -102,6 +102,8 @@ class DeviceSeeder extends Seeder
             'device_model_id' => $modelId,
             'firmware_version' => 'v1.0.0',
             'company_id'      => $companyId,
+            'assigned_at'     => now(),
+            'assigned_by'     => 1,
             'area_id'         => $areaId,
             'device_name'     => $name,
             'status'          => $status,
@@ -207,7 +209,6 @@ class DeviceSeeder extends Seeder
             'effective_to'            => null,
             'last_synced_at'          => null,
             'updated_by'              => null,
-            'created_at'              => now(),
         ]);
     }
 }

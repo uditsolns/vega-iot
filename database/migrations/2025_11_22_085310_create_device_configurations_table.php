@@ -24,7 +24,6 @@ return new class extends Migration {
             $table->timestampTz('last_synced_at')->nullable();
 
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete('set null');
-            $table->timestampTz('created_at')->useCurrent();
 
             $table->index('device_id', 'idx_device_configs_device');
             $table->index(['device_id', 'effective_from', 'effective_to'], 'idx_device_configs_effective');

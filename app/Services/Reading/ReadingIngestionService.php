@@ -110,7 +110,7 @@ class ReadingIngestionService
                         ]
                     );
                 } else {
-                    DB::table('sensor_readings')->insertOrIgnore($row);
+                    DB::table('sensor_readings')->insert($row);
                 }
 
                 $insertedCount++;

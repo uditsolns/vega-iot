@@ -34,10 +34,12 @@ class ZionGatewayController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
-        Log::info("Reading Received: ", $request->all());
+        $body = $request->json()->all();
 
-        $deviceUid = $request->query('deviceUid')
-            ?? $request->json('entity.data.deviceUid')
+        $deviceUid = $request->query('uid')                    // top-level, always present
+            ?? data_get($body, 'entity.data.deviceUid')        // normal reading fallback
+            ?? data_get($body, 'entity.data.0.deviceUid')      // offline readings fallback
+            ?? data_get($body, 'entity.data.resp.deviceUid')   // config ack fallback
             ?? null;
 
         if (!$deviceUid) {
@@ -54,17 +56,18 @@ class ZionGatewayController extends Controller
             return response()->json($this->adapter->buildSuccessResponse());
         }
 
-        // ── Step 1: Config-ack handling ──────────────────────────────────────
+        // Step 1: Config-ack handling
         $ackResult = $this->adapter->parseConfigAck($request);
         if ($ackResult === 'confirmed') {
             $this->markConfigConfirmed($device);
         }
 
-        // ── Step 2: Sensor data ingestion ────────────────────────────────────
+        // Step 2: Sensor data ingestion
         try {
             $batches = $this->adapter->parseReadings($request);
             if (!empty($batches)) {
-                $this->ingestion->ingestBatches($device, $batches);
+                $ingested = $this->ingestion->ingestBatches($device, $batches);
+                Log::info("Batches Ingested: ", $ingested);
                 $device->updateQuietly(['status' => DeviceStatus::Online]);
             }
         } catch (\Throwable $e) {
@@ -74,7 +77,7 @@ class ZionGatewayController extends Controller
             ]);
         }
 
-        // ── Step 3: Pending config command ───────────────────────────────────
+        // Step 3: Pending config command
         $configCommand = $this->getPendingCommand($device);
 
         return response()->json(
@@ -82,7 +85,7 @@ class ZionGatewayController extends Controller
         );
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    // Helpers
 
     private function markConfigConfirmed(Device $device): void
     {
@@ -91,7 +94,12 @@ class ZionGatewayController extends Controller
             ->latest()
             ->first();
 
-        $pending?->markConfirmed();
+        if (!$pending) return;
+
+        $pending->markConfirmed();
+
+        $device->currentConfiguration()
+            ->update(['last_synced_at' => now()]);
     }
 
     private function getPendingCommand(Device $device): ?string
@@ -106,14 +114,7 @@ class ZionGatewayController extends Controller
             return null;
         }
 
-        try {
-            $command = $this->adapter->buildConfigCommand($pending->requested_config);
-            $pending->markSent();
-            return $command;
-        } catch (\RuntimeException $e) {
-            Log::warning('[Zion] Could not build config command', ['error' => $e->getMessage()]);
-            $pending->markFailed($e->getMessage());
-            return null;
-        }
+        $pending->markSent();
+        return $pending->vendor_command;
     }
 }

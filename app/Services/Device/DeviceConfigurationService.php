@@ -2,6 +2,7 @@
 
 namespace App\Services\Device;
 
+use App\Enums\ConfigRequestStatus;
 use App\Models\Device;
 use App\Models\DeviceConfiguration;
 use App\Models\DeviceConfigurationRequest;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\DB;
 
 readonly class DeviceConfigurationService
 {
+    public function __construct(private VendorAdapterFactory $adapterFactory) {}
+
     public function getCurrent(Device $device): ?DeviceConfiguration
     {
         return $device->currentConfiguration;
@@ -59,26 +62,26 @@ readonly class DeviceConfigurationService
         });
     }
 
-    private function createConfigRequest(Device $device, array $data, User $user): ?DeviceConfigurationRequest
+    private function createConfigRequest(Device $device, array $data, User $user): void
     {
         $device->loadMissing('deviceModel');
-        $adapter = VendorAdapterFactory::makeForDevice($device);
+        $adapter = $this->adapterFactory->makeForDevice($device);
 
         try {
             $vendorCommand = $adapter->buildConfigCommand($data);
         } catch (\RuntimeException) {
-            return null;
+            return;
         }
 
         if (empty($vendorCommand)) {
-            return null;
+            return;
         }
 
-        return DeviceConfigurationRequest::create([
+        DeviceConfigurationRequest::create([
             'device_id' => $device->id,
             'requested_config' => $data,
             'vendor_command' => $vendorCommand,
-            'status' => \App\Enums\ConfigRequestStatus::Pending,
+            'status' => ConfigRequestStatus::Pending,
             'requested_by' => $user->id,
         ]);
     }

@@ -102,6 +102,11 @@ class ZionAdapter implements VendorAdapterInterface
         $body = $request->json()->all();
         $data = $body['entity']['data'] ?? [];
 
+        // Batch/array payloads are never config acks
+        if (!is_array($data) || isset($data[0])) {
+            return null;
+        }
+
         if (!empty($data['config_update']) || !empty($data['query_response'])) {
             // Device responded – treat as confirmed
             return 'confirmed';

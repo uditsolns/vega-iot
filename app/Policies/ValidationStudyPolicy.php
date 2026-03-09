@@ -51,7 +51,7 @@ class ValidationStudyPolicy
 
     public function delete(User $user, ValidationStudy $study): bool
     {
-        if (!$user->hasPermission('validations_studies.delete')) {
+        if (!$user->hasPermission('validation_studies.delete')) {
             return false;
         }
 

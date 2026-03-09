@@ -29,6 +29,12 @@ use App\Policies\TicketPolicy;
 use App\Policies\UserPolicy;
 use App\Policies\ValidationStudyPolicy;
 use App\Services\Report\PDF\PdfGeneratorService;
+use App\Vendor\Adapters\AliterAdapter;
+use App\Vendor\Adapters\IdeabyteAdapter;
+use App\Vendor\Adapters\SunsuiAdapter;
+use App\Vendor\Adapters\TZoneAdapter;
+use App\Vendor\Adapters\ZionAdapter;
+use App\Vendor\VendorAdapterFactory;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -39,6 +45,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Adapters are stateless — singleton per request is appropriate
+        $this->app->singleton(ZionAdapter::class);
+        $this->app->singleton(TZoneAdapter::class);
+        $this->app->singleton(IdeabyteAdapter::class);
+        $this->app->singleton(AliterAdapter::class);
+        $this->app->singleton(SunsuiAdapter::class);
+
+        // Factory itself is injectable
+        $this->app->singleton(VendorAdapterFactory::class);
+
         $this->app->singleton(PdfGeneratorService::class);
     }
 
