@@ -40,6 +40,8 @@ class AreaResource extends JsonResource
 
             // Relationships
             'hub' => new HubResource($this->whenLoaded('hub')),
+            'devices' => DeviceResource::collection($this->whenLoaded('devices')),
+            'devices_count' => $this->whenCounted('devices'),
 
             // Timestamps
             'created_at' => $this->created_at,

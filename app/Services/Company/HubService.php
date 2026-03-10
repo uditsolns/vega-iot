@@ -28,7 +28,7 @@ readonly class HubService
                 AllowedFilter::exact("location_id"),
             ])
             ->allowedSorts(["name", "created_at"])
-            ->allowedIncludes(["location"])
+            ->allowedIncludes(["location", "areas"])
             ->defaultSort("-created_at")
             ->paginate($filters["per_page"] ?? 20);
     }

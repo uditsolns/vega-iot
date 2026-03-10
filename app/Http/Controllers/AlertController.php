@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Alert\AcknowledgeAlertRequest;
-use App\Http\Requests\Alert\ListAlertsRequest;
 use App\Http\Requests\Alert\ResolveAlertRequest;
-use App\Http\Resources\AlertNotificationResource;
 use App\Http\Resources\AlertResource;
 use App\Models\Alert;
 use App\Services\Alert\AlertService;

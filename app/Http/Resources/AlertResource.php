@@ -59,8 +59,6 @@ class AlertResource extends JsonResource
             'device' => new DeviceResource($this->whenLoaded('device')),
             'acknowledged_by_user' => new UserResource($this->whenLoaded('acknowledgedBy')),
             'resolved_by_user' => new UserResource($this->whenLoaded('resolvedBy')),
-            'notifications' => AlertNotificationResource::collection($this->whenLoaded('notifications')),
-            'notifications_count' => $this->whenCounted('notifications'),
         ];
     }
 }

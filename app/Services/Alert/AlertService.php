@@ -46,7 +46,6 @@ readonly class AlertService
                 "device.area.hub.location",
                 "acknowledgedBy",
                 "resolvedBy",
-                "notifications",
             ])
             ->defaultSort("-started_at")
             ->paginate($filters["per_page"] ?? 20);

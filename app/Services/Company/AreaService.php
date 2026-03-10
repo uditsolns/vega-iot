@@ -29,7 +29,7 @@ readonly class AreaService
                 AllowedFilter::exact("hub_id"),
             ])
             ->allowedSorts(["name", "created_at"])
-            ->allowedIncludes(["hub"])
+            ->allowedIncludes(["hub", "devices"])
             ->defaultSort("-created_at")
             ->paginate($filters["per_page"] ?? 20);
     }
