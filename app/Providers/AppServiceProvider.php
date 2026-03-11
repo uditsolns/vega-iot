@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Alert;
+use App\Models\AlertResolutionOption;
 use App\Models\Area;
 use App\Models\AuditReport;
 use App\Models\CalibrationInstrument;
@@ -16,6 +17,7 @@ use App\Models\Ticket;
 use App\Models\User;
 use App\Models\ValidationStudy;
 use App\Policies\AlertPolicy;
+use App\Policies\AlertResolutionOptionPolicy;
 use App\Policies\AreaPolicy;
 use App\Policies\AuditReportPolicy;
 use App\Policies\CalibrationInstrumentPolicy;
@@ -77,6 +79,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ValidationStudy::class, ValidationStudyPolicy::class);
         Gate::policy(Report::class, ReportPolicy::class);
         Gate::policy(AuditReport::class, AuditReportPolicy::class);
+        Gate::policy(AlertResolutionOption::class, AlertResolutionOptionPolicy::class);
+        // TODO: SensorTypePolicy, ScheduledReportPolicy, DeviceModelPolicyAudi
 
         // Event listeners are auto-discovered from app/Listeners
         // No need to manually register them here

@@ -27,11 +27,13 @@ return new class extends Migration {
 
             $table->timestampTz('acknowledged_at')->nullable();
             $table->foreignId('acknowledged_by')->nullable()->constrained('users')->onDelete('set null');
-            $table->text('acknowledge_comment')->nullable();
 
             $table->timestampTz('resolved_at')->nullable();
             $table->foreignId('resolved_by')->nullable()->constrained('users')->onDelete('set null');
-            $table->text('resolve_comment')->nullable();
+
+            $table->string('possible_cause', 200)->nullable();
+            $table->string('root_cause', 200)->nullable();
+            $table->string('corrective_action', 200)->nullable();
 
             $table->timestampTz('last_notification_at')->nullable();
             $table->integer('notification_count')->default(0);

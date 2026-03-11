@@ -12,23 +12,15 @@ use Illuminate\Support\Facades\DB;
  * Seeds representative alerts in every lifecycle state for ACME-DEV-0001 (Zion).
  *
  * States covered:
- *   1. ACTIVE critical   – temperature (unacknowledged, ongoing)
- *   2. ACKNOWLEDGED warning – humidity (seen, being monitored)
+ *   1. ACTIVE critical      – temperature high (unacknowledged, ongoing)
+ *   2. ACKNOWLEDGED warning – humidity high (seen, being monitored)
  *   3. AUTO-RESOLVED warning – temperature low (sensor recovered on its own)
- *   4. RESOLVED critical   – temperature high (manually closed 3 days ago)
- *
- * After running this seeder you can:
- *   - POST a normal reading   → no new alert (all good)
- *   - POST a breach reading   → alert #1 gets updated trigger_value + re-notified
- *   - POST a back-in-range    → alert #1 auto-resolves
- *   - PATCH /alerts/{id}/acknowledge → alert #1 transitions
- *   - PATCH /alerts/{id}/resolve     → alert #1 closes
+ *   4. RESOLVED critical    – temperature high (manually closed 3 days ago)
  */
 class AlertSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Resolve the first Zion device (Acme, model 1) ────────────────────
         $device = DB::table('devices')
             ->where('device_code', 'ACME-DEV-0001')
             ->first();
@@ -56,10 +48,7 @@ class AlertSeeder extends Seeder
         $adminUser = DB::table('users')->where('email', 'john.smith@acme.com')->first();
         $now       = Carbon::now();
 
-        // ── 1. ACTIVE critical alert — temperature high, 2 h ago ─────────────
-        // Use this one for testing: POST a breach reading to update it,
-        //   POST back-in-range to auto-resolve it,
-        //   or PATCH /acknowledge / /resolve via API.
+        // ── 1. ACTIVE critical — temperature high, 2 h ago ───────────────────
         DB::table('alerts')->insert([
             'device_id'            => $device->id,
             'device_sensor_id'     => $tempSensor->id,
@@ -73,10 +62,11 @@ class AlertSeeder extends Seeder
             'duration_seconds'     => null,
             'acknowledged_at'      => null,
             'acknowledged_by'      => null,
-            'acknowledge_comment'  => null,
             'resolved_at'          => null,
             'resolved_by'          => null,
-            'resolve_comment'      => null,
+            'possible_cause'       => null,
+            'root_cause'           => null,
+            'corrective_action'    => null,
             'last_notification_at' => $now->copy()->subHours(2)->toDateTimeString(),
             'notification_count'   => 1,
             'created_at'           => $now->copy()->subHours(2)->toDateTimeString(),
@@ -96,10 +86,11 @@ class AlertSeeder extends Seeder
             'duration_seconds'     => null,
             'acknowledged_at'      => $now->copy()->subHours(4)->toDateTimeString(),
             'acknowledged_by'      => $adminUser?->id,
-            'acknowledge_comment'  => 'Monitoring closely – may be environmental.',
             'resolved_at'          => null,
             'resolved_by'          => null,
-            'resolve_comment'      => null,
+            'possible_cause'       => 'Environmental Factors',
+            'root_cause'           => 'Door Left Open',
+            'corrective_action'    => 'Preventive Maintenance',
             'last_notification_at' => $now->copy()->subHours(4)->toDateTimeString(),
             'notification_count'   => 2,
             'created_at'           => $now->copy()->subHours(5)->toDateTimeString(),
@@ -122,10 +113,11 @@ class AlertSeeder extends Seeder
             'duration_seconds'     => $startedAt3->diffInSeconds($resolvedAt3),
             'acknowledged_at'      => null,
             'acknowledged_by'      => null,
-            'acknowledge_comment'  => null,
             'resolved_at'          => null,
             'resolved_by'          => null,
-            'resolve_comment'      => null,
+            'possible_cause'       => null,
+            'root_cause'           => null,
+            'corrective_action'    => null,
             'last_notification_at' => $resolvedAt3->toDateTimeString(),
             'notification_count'   => 2,
             'created_at'           => $startedAt3->toDateTimeString(),
@@ -148,10 +140,11 @@ class AlertSeeder extends Seeder
             'duration_seconds'     => $startedAt4->diffInSeconds($resolvedAt4),
             'acknowledged_at'      => $startedAt4->copy()->addMinutes(30)->toDateTimeString(),
             'acknowledged_by'      => $adminUser?->id,
-            'acknowledge_comment'  => 'Maintenance team dispatched.',
             'resolved_at'          => $resolvedAt4->toDateTimeString(),
             'resolved_by'          => $adminUser?->id,
-            'resolve_comment'      => 'Cooling unit serviced. Temperature stable.',
+            'possible_cause'       => 'Device Failure',
+            'root_cause'           => 'Air Conditioner Not Working',
+            'corrective_action'    => 'Sensor/Device Replacement',
             'last_notification_at' => $resolvedAt4->toDateTimeString(),
             'notification_count'   => 4,
             'created_at'           => $startedAt4->toDateTimeString(),

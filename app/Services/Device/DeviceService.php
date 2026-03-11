@@ -14,6 +14,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use InvalidArgumentException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 
 readonly class DeviceService
 {
@@ -176,12 +177,18 @@ readonly class DeviceService
 
     public function unassign(Device $device): Device
     {
-        $device->update(['company_id' => null, 'area_id' => null, 'device_name' => null]);
+        if (!$device->isDeployed()) {
+            throw DeviceAssignmentException::deviceNotAssigned($device->device_code);
+        }
 
-        activity('device')->event('unassigned')
+        $area = $device->area;
+        $device->update(['area_id' => null, 'device_name' => 'Unassigned']);
+
+        activity('device')
+            ->event('unassigned')
             ->performedOn($device)
-            ->withProperties(['device_id' => $device->id])
-            ->log("Unassigned device \"{$device->device_code}\"");
+            ->withProperties(['device_id' => $device->id, 'area_id' => $area->id])
+            ->log("Unassigned device \"{$device->device_code}\" from area \"{$area->name}\"");
 
         return $device->fresh();
     }

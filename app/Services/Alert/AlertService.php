@@ -67,20 +67,16 @@ readonly class AlertService
     /**
      * Acknowledge an alert
      */
-    public function acknowledge(Alert $alert, User $user, ?string $comment = null): Alert
+    public function acknowledge(Alert $alert, User $user, array $resolution): Alert
     {
-        if (!$alert->acknowledge($user, $comment)) {
+        if (!$alert->acknowledge($user, $resolution)) {
             throw new \InvalidArgumentException('Only active alerts can be acknowledged.');
         }
 
-        // Audit log
-        activity("alert")
+        activity('alert')
             ->performedOn($alert)
             ->event('acknowledged')
-            ->withProperties([
-                'device_id' => $alert->device->id,
-                'alert_id' => $alert->id,
-            ])
+            ->withProperties(['device_id' => $alert->device_id, 'alert_id' => $alert->id])
             ->log("Acknowledged {$alert->severity->value} alert for device \"{$alert->device->device_code}\"");
 
         $this->sendAcknowledgedNotification($alert->fresh(['device.area.hub.location', 'deviceSensor.sensorType']), $user);
@@ -91,20 +87,16 @@ readonly class AlertService
     /**
      * Resolve an alert
      */
-    public function resolve(Alert $alert, User $user, ?string $comment = null): Alert
+    public function resolve(Alert $alert, User $user, array $resolution): Alert
     {
-        if (!$alert->resolve($user, $comment)) {
+        if (!$alert->resolve($user, $resolution)) {
             throw new \InvalidArgumentException('Only active or acknowledged alerts can be resolved.');
         }
 
-        // Audit log
-        activity("alert")
+        activity('alert')
             ->performedOn($alert)
             ->event('resolved')
-            ->withProperties([
-                'device_id' => $alert->device->id,
-                'alert_id' => $alert->id,
-            ])
+            ->withProperties(['device_id' => $alert->device_id, 'alert_id' => $alert->id])
             ->log("Resolved {$alert->severity->value} alert for device \"{$alert->device->device_code}\"");
 
         $this->sendResolvedNotification($alert->fresh(['device.area.hub.location', 'deviceSensor.sensorType']), $user);

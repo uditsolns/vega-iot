@@ -25,10 +25,11 @@ class Alert extends Model
         'duration_seconds',
         'acknowledged_at',
         'acknowledged_by',
-        'acknowledge_comment',
         'resolved_at',
         'resolved_by',
-        'resolve_comment',
+        'possible_cause',
+        'root_cause',
+        'corrective_action',
         'last_notification_at',
         'notification_count',
     ];
@@ -127,21 +128,23 @@ class Alert extends Model
     // ACTIONS
     // ========================================
 
-    public function acknowledge(User $user, ?string $comment = null): bool
+    public function acknowledge(User $user, array $resolution): bool
     {
         if ($this->status !== AlertStatus::Active) {
             return false;
         }
 
         return $this->update([
-            'status'              => AlertStatus::Acknowledged,
-            'acknowledged_at'     => now(),
-            'acknowledged_by'     => $user->id,
-            'acknowledge_comment' => $comment,
+            'status'            => AlertStatus::Acknowledged,
+            'acknowledged_at'   => now(),
+            'acknowledged_by'   => $user->id,
+            'possible_cause'    => $resolution['possible_cause'],
+            'root_cause'        => $resolution['root_cause'],
+            'corrective_action' => $resolution['corrective_action'],
         ]);
     }
 
-    public function resolve(User $user, ?string $comment = null): bool
+    public function resolve(User $user, array $resolution): bool
     {
         if (!in_array($this->status, [AlertStatus::Active, AlertStatus::Acknowledged])) {
             return false;
@@ -150,12 +153,14 @@ class Alert extends Model
         $endedAt = now();
 
         return $this->update([
-            'status'           => AlertStatus::Resolved,
-            'resolved_at'      => $endedAt,
-            'resolved_by'      => $user->id,
-            'resolve_comment'  => $comment,
-            'ended_at'         => $endedAt,
-            'duration_seconds' => (int) $this->started_at->diffInSeconds($endedAt),
+            'status'            => AlertStatus::Resolved,
+            'resolved_at'       => $endedAt,
+            'resolved_by'       => $user->id,
+            'ended_at'          => $endedAt,
+            'duration_seconds'  => (int) $this->started_at->diffInSeconds($endedAt),
+            'possible_cause'    => $resolution['possible_cause'],
+            'root_cause'        => $resolution['root_cause'],
+            'corrective_action' => $resolution['corrective_action'],
         ]);
     }
 

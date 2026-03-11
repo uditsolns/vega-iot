@@ -47,16 +47,14 @@ class AlertController extends Controller
     /**
      * Acknowledge a single alert
      */
-    public function acknowledge(
-        AcknowledgeAlertRequest $request,
-        Alert $alert,
-    ): JsonResponse {
-        $this->authorize("acknowledge", $alert);
+    public function acknowledge(AcknowledgeAlertRequest $request, Alert $alert): JsonResponse
+    {
+        $this->authorize('acknowledge', $alert);
 
         $alert = $this->alertService->acknowledge(
             $alert,
             $request->user(),
-            $request->validated("comment"),
+            $request->validated(),
         );
 
         return $this->success(new AlertResource($alert), "Alert acknowledged");
@@ -65,16 +63,14 @@ class AlertController extends Controller
     /**
      * Resolve a single alert
      */
-    public function resolve(
-        ResolveAlertRequest $request,
-        Alert $alert,
-    ): JsonResponse {
-        $this->authorize("resolve", $alert);
+    public function resolve(ResolveAlertRequest $request, Alert $alert): JsonResponse
+    {
+        $this->authorize('resolve', $alert);
 
         $alert = $this->alertService->resolve(
             $alert,
             $request->user(),
-            $request->validated("comment"),
+            $request->validated(),
         );
 
         return $this->success(new AlertResource($alert), "Alert resolved");

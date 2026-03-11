@@ -18,37 +18,32 @@ class DashboardService
      */
     public function getOverview(User $user): array
     {
-        // Get accessible devices
         $devicesQuery = Device::forUser($user);
-        $totalDevices = $devicesQuery->clone()->count();
+
+        $totalDevices  = $devicesQuery->clone()->count();
         $devicesOnline = $devicesQuery->clone()->where('status', DeviceStatus::Online)->count();
         $devicesOffline = $devicesQuery->clone()->where('status', DeviceStatus::Offline)->count();
 
-        // Get active and critical alerts
-        $alerts = Alert::forUser($user)
-            ->whereIn('status', [AlertStatus::Active, AlertStatus::Acknowledged])
+        // Single query: distinct device+severity pairs for all open alerts
+        $openStatuses = [AlertStatus::Active->value, AlertStatus::Acknowledged->value];
+
+        $alertedDevices = Alert::forUser($user)
+            ->whereIn('status', $openStatuses)
+            ->selectRaw('device_id, severity')
+            ->distinct()
             ->get();
-        $activeAlertsCount = $alerts->count();
-        $criticalAlertsCount = $alerts->where('severity', AlertSeverity::Critical)->count();
 
-        // Get ticket statistics
-        $ticketsOpenCount = Ticket::forUser($user)
-            ->where('status', TicketStatus::Open)
-            ->count();
-
-        $ticketsAssignedToMe = Ticket::forUser($user)
-            ->where('assigned_to', $user->id)
-            ->whereIn('status', [TicketStatus::Open, TicketStatus::InProgress])
-            ->count();
+        $warningDeviceCount  = $alertedDevices->where('severity', AlertSeverity::Warning->value)->pluck('device_id')->unique()->count();
+        $criticalDeviceCount = $alertedDevices->where('severity', AlertSeverity::Critical->value)->pluck('device_id')->unique()->count();
+        $anyAlertedCount     = $alertedDevices->pluck('device_id')->unique()->count();
 
         return [
-            'total_devices' => $totalDevices,
-            'devices_online' => $devicesOnline,
-            'devices_offline' => $devicesOffline,
-            'active_alerts_count' => $activeAlertsCount,
-            'critical_alerts_count' => $criticalAlertsCount,
-            'tickets_open_count' => $ticketsOpenCount,
-            'tickets_assigned_to_me' => $ticketsAssignedToMe,
+            'total_devices'        => $totalDevices,
+            'devices_online'       => $devicesOnline,
+            'devices_offline'      => $devicesOffline,
+            'devices_good'         => $totalDevices - $anyAlertedCount,
+            'devices_with_warning' => $warningDeviceCount,
+            'devices_with_critical' => $criticalDeviceCount,
         ];
     }
 }

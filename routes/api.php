@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AlertController;
+use App\Http\Controllers\AlertResolutionOptionController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
@@ -242,6 +243,14 @@ Route::prefix("v1")->group(function () {
                 Route::get('{sensor}/configuration/history', 'configurationHistory');
             });
 
+        Route::prefix('alert-resolution-options')
+            ->controller(AlertResolutionOptionController::class)
+            ->group(function () {
+                Route::post('/', 'store');
+                Route::put('{alertResolutionOption}', 'update');
+                Route::delete('{alertResolutionOption}', 'destroy');
+        });
+
         // Alerts
         Route::prefix("alerts")
             ->controller(AlertController::class)
@@ -311,4 +320,6 @@ Route::prefix("v1")->group(function () {
         // Studies
         Route::apiResource("validation-studies", ValidationStudyController::class);
     });
+
+    Route::get('alert-resolution-options', [AlertResolutionOptionController::class, 'index']);
 });

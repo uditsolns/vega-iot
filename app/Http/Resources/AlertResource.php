@@ -38,22 +38,20 @@ class AlertResource extends JsonResource
             // Acknowledgment
             'acknowledged_at' => $this->acknowledged_at,
             'acknowledged_by' => $this->acknowledged_by,
-            'acknowledge_comment' => $this->acknowledge_comment,
 
             // Resolution
             'resolved_at' => $this->resolved_at,
             'resolved_by' => $this->resolved_by,
-            'resolve_comment' => $this->resolve_comment,
+
+            'possible_cause' => $this->possible_cause,
+            'root_cause' => $this->root_cause,
+            'corrective_action' => $this->corrective_action,
 
             // Notification tracking
             'last_notification_at' => $this->last_notification_at,
             'notification_count' => $this->notification_count,
 
             'created_at' => $this->created_at,
-
-            // Computed attributes
-            'device_name' => $this->device_name,
-            'area_name' => $this->area_name,
 
             // Relationships
             'device' => new DeviceResource($this->whenLoaded('device')),

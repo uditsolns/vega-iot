@@ -29,4 +29,12 @@ class DeviceAssignmentException extends Exception
     {
         return new self("You do not have access to assign devices to area: $areaName");
     }
+
+    /**
+     * Create a new exception instance when trying to unassign a device that isn't assigned.
+     */
+    public static function deviceNotAssigned(string $deviceCode): self
+    {
+        return new self("Cannot unassign device $deviceCode because it is not assigned.");
+    }
 }
