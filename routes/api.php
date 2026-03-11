@@ -254,6 +254,7 @@ Route::prefix("v1")->group(function () {
                 Route::get("{alert}", "show");
                 Route::patch("{alert}/acknowledge", "acknowledge");
                 Route::patch("{alert}/resolve", "resolve");
+                Route::get('{alert}/report','report');
             });
 
         // Tickets - Enhanced with lifecycle actions

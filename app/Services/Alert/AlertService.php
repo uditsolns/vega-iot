@@ -6,6 +6,7 @@ use App\Models\Alert;
 use App\Models\User;
 use App\Notifications\AlertAcknowledgedNotification;
 use App\Notifications\AlertResolvedNotification;
+use App\Services\Alert\PDF\AlertPdfGeneratorService;
 use App\Traits\ResolvesAlertRecipients;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Notification;
@@ -15,6 +16,10 @@ use Spatie\QueryBuilder\QueryBuilder;
 readonly class AlertService
 {
     use ResolvesAlertRecipients;
+
+    public function __construct(
+        private AlertPdfGeneratorService $pdfGenerator,
+    ) {}
 
     /**
      * List alerts with filtering, sorting, and includes.
@@ -142,5 +147,10 @@ readonly class AlertService
             resolvedByName:   trim("{$actingUser->first_name} {$actingUser->last_name}"),
             resolvedAt:       $alert->resolved_at->toDateTimeString(),
         ));
+    }
+
+    public function generateReport(Alert $alert): string
+    {
+        return $this->pdfGenerator->generate($alert);
     }
 }

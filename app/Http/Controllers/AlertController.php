@@ -10,6 +10,7 @@ use App\Services\Alert\AlertService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class AlertController extends Controller
 {
@@ -74,5 +75,19 @@ class AlertController extends Controller
         );
 
         return $this->success(new AlertResource($alert), "Alert resolved");
+    }
+
+    public function report(Alert $alert): Response
+    {
+        $this->authorize('view', $alert);
+
+        $pdf = $this->alertService->generateReport($alert);
+
+        $filename = "Alert-Report-{$alert->device->device_code}-{$alert->id}.pdf";
+
+        return response($pdf, 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 }
