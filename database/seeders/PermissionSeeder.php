@@ -379,6 +379,31 @@ class PermissionSeeder extends Seeder
                 "action" => "delete",
                 "description" => "Delete custom roles",
             ],
+            // Alert Resolution Options
+            [
+                'name'        => 'alert_resolution_options.view',
+                'resource'    => 'alert_resolution_options',
+                'action'      => 'view',
+                'description' => 'View alert resolution options',
+            ],
+            [
+                'name'        => 'alert_resolution_options.create',
+                'resource'    => 'alert_resolution_options',
+                'action'      => 'create',
+                'description' => 'Create alert resolution options',
+            ],
+            [
+                'name'        => 'alert_resolution_options.update',
+                'resource'    => 'alert_resolution_options',
+                'action'      => 'update',
+                'description' => 'Update alert resolution options',
+            ],
+            [
+                'name'        => 'alert_resolution_options.delete',
+                'resource'    => 'alert_resolution_options',
+                'action'      => 'delete',
+                'description' => 'Delete alert resolution options',
+            ],
         ];
 
         DB::table("permissions")->insert($permissions);

@@ -71,6 +71,7 @@ class RolePermissionSeeder extends Seeder
             "assets.view",
             "validation_studies.view",
             "roles.view",
+            'alert_resolution_options.view',
         ];
 
         foreach ($companyUserPermissions as $permission) {

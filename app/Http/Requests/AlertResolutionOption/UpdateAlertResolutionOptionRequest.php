@@ -8,7 +8,7 @@ class UpdateAlertResolutionOptionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->isSuperAdmin();
+        return true;
     }
 
     public function rules(): array

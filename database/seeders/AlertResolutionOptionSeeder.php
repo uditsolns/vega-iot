@@ -43,8 +43,8 @@ class AlertResolutionOptionSeeder extends Seeder
         foreach ($options as $type => $labels) {
             foreach ($labels as $index => $label) {
                 AlertResolutionOption::firstOrCreate(
-                    ['type' => $type, 'label' => $label],
-                    ['sort_order' => $index + 1],
+                    ['type' => $type, 'label' => $label, 'company_id' => null],
+                    ['sort_order' => $index + 1, 'is_system'  => true],
                 );
             }
         }

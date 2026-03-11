@@ -13,10 +13,12 @@ class AlertResolutionOptionResource extends JsonResource
     {
         return [
             'id'         => $this->id,
+            'company_id' => $this->company_id,
             'type'       => $this->type->value,
             'type_label' => $this->type->label(),
             'label'      => $this->label,
             'sort_order' => $this->sort_order,
+            'is_system'  => $this->is_system,
         ];
     }
 }
