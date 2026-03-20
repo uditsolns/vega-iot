@@ -35,13 +35,10 @@ class Area extends Model
         "alert_back_in_range_enabled",
         "alert_device_status_enabled",
         "acknowledged_alert_notification_interval",
+        "mapping_report_path",
+        "device_calibration_report_path",
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [

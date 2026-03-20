@@ -36,9 +36,7 @@ Route::prefix("v1")->group(function () {
         Route::post("login", [LoginController::class, "login"]);
         Route::controller(PasswordController::class)->group(function () {
             Route::post("forgot-password", "forgotPassword");
-            Route::post("reset-password", "resetPassword")->name(
-                "password.reset",
-            );
+            Route::post("reset-password", "resetPassword")->name("password.reset");
         });
     });
 
@@ -55,7 +53,6 @@ Route::prefix("v1")->group(function () {
                 Route::get("permissions", "permissions");
                 Route::get("areas", "areas");
 
-                // These bypass prepare.user middleware for performance
                 Route::withoutMiddleware("prepare.user")->group(function () {
                     Route::put("/", "update");
                     Route::patch("password", "changePassword");
@@ -165,8 +162,10 @@ Route::prefix("v1")->group(function () {
                 Route::patch("{id}/restore", "restore");
             });
 
-        // Areas
+        // Areas - CRUD
         Route::apiResource("areas", AreaController::class);
+
+        // Areas - Actions & sub-resources
         Route::controller(AreaController::class)
             ->prefix("areas")
             ->group(function () {
@@ -177,8 +176,17 @@ Route::prefix("v1")->group(function () {
                 Route::get("{area}/devices", "devices");
                 Route::get("{area}/stats", "stats");
                 Route::patch("{id}/restore", "restore");
-            });
 
+                // Mapping report
+                Route::post("{area}/mapping-report", "uploadMappingReport");
+                Route::get("{area}/mapping-report", "downloadMappingReport");
+                Route::delete("{area}/mapping-report", "deleteMappingReport");
+
+                // Device calibration report
+                Route::post("{area}/device-calibration-report", "uploadDeviceCalibrationReport");
+                Route::get("{area}/device-calibration-report", "downloadDeviceCalibrationReport");
+                Route::delete("{area}/device-calibration-report", "deleteDeviceCalibrationReport");
+            });
 
         // Device Models (Super Admin only)
         Route::prefix('device-models')
@@ -193,21 +201,17 @@ Route::prefix("v1")->group(function () {
         // Sensor Types (read-only for all authenticated users)
         Route::get('sensor-types', fn() => response()->json([
             'data' => SensorType::all()->map(fn($t) => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'unit' => $t->unit,
-                'data_type' => $t->data_type->value,
+                'id'                        => $t->id,
+                'name'                      => $t->name,
+                'unit'                      => $t->unit,
+                'data_type'                 => $t->data_type->value,
                 'supports_threshold_config' => $t->supports_threshold_config,
             ])
         ]));
 
         // Devices
         Route::get('devices/stats', [DeviceController::class, 'getStats']);
-
-        // Devices - CRUD
         Route::apiResource("devices", DeviceController::class);
-
-        // Devices - Actions
         Route::controller(DeviceController::class)
             ->prefix("devices")
             ->group(function () {
@@ -254,10 +258,10 @@ Route::prefix("v1")->group(function () {
                 Route::get("{alert}", "show");
                 Route::patch("{alert}/acknowledge", "acknowledge");
                 Route::patch("{alert}/resolve", "resolve");
-                Route::get('{alert}/report','report');
+                Route::get('{alert}/report', 'report');
             });
 
-        // Tickets - Enhanced with lifecycle actions
+        // Tickets
         Route::apiResource("tickets", TicketController::class);
         Route::prefix("tickets")->group(function () {
             Route::controller(TicketController::class)->group(function () {
@@ -267,12 +271,10 @@ Route::prefix("v1")->group(function () {
                 Route::patch("{ticket}/reopen", "reopen");
             });
 
-            Route::controller(TicketCommentController::class)->group(
-                function () {
-                    Route::get("{ticket}/comments", "index");
-                    Route::post("{ticket}/comments", "store");
-                },
-            );
+            Route::controller(TicketCommentController::class)->group(function () {
+                Route::get("{ticket}/comments", "index");
+                Route::post("{ticket}/comments", "store");
+            });
         });
 
         // Audit Logs
@@ -289,7 +291,7 @@ Route::prefix("v1")->group(function () {
                 Route::get("/", "index");
                 Route::post("/", "store");
                 Route::get('{report}/download', 'download');
-        });
+            });
 
         // Scheduled Reports
         Route::apiResource("scheduled-reports", ScheduledReportController::class);
@@ -310,10 +312,28 @@ Route::prefix("v1")->group(function () {
                 Route::get('{auditReport}/download', 'download');
             });
 
-        // Instruments
+        // Calibration Instruments
+        // Note: import route declared before apiResource to avoid binding conflict
+        Route::post("calibration-instruments/import", [CalibrationInstrumentController::class, "import"]);
         Route::apiResource("calibration-instruments", CalibrationInstrumentController::class);
+        Route::prefix("calibration-instruments")
+            ->controller(CalibrationInstrumentController::class)
+            ->group(function () {
+                Route::post("{calibrationInstrument}/report", "uploadReport");
+                Route::get("{calibrationInstrument}/report", "downloadReport");
+                Route::delete("{calibrationInstrument}/report", "deleteReport");
+            });
 
-        // Studies
+        // Validation Studies
+        // Note: import route declared before apiResource to avoid binding conflict
+        Route::post("validation-studies/import", [ValidationStudyController::class, "import"]);
         Route::apiResource("validation-studies", ValidationStudyController::class);
+        Route::prefix("validation-studies")
+            ->controller(ValidationStudyController::class)
+            ->group(function () {
+                Route::post("{validationStudy}/report", "uploadReport");
+                Route::get("{validationStudy}/report", "downloadReport");
+                Route::delete("{validationStudy}/report", "deleteReport");
+            });
     });
 });

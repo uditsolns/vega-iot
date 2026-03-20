@@ -35,6 +35,10 @@ return new class extends Migration {
                 ->integer("acknowledged_alert_notification_interval")
                 ->default(24);
 
+            // report paths
+            $table->string('mapping_report_path')->nullable();
+            $table->string('device_calibration_report_path')->nullable();
+
             $table->timestamps();
 
             // Unique constraint

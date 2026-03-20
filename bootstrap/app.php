@@ -112,7 +112,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($e instanceof NotFoundHttpException) {
                 return response()->json(
                     [
-                        "message" => "The requested resource was not found",
+                        "message" => $e->getMessage(),
                     ],
                     404,
                 );

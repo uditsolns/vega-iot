@@ -34,6 +34,8 @@ return new class extends Migration {
             $table->date('last_calibrated_at')->nullable();
             $table->date('calibration_due_at')->nullable();
 
+            // report path
+            $table->string('report_path')->nullable()->after('calibration_due_at');
 
             $table->timestamps();
 

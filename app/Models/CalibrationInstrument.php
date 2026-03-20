@@ -27,6 +27,7 @@ class CalibrationInstrument extends Model
         'last_calibrated_at',
         'calibration_due_at',
         'is_active',
+        'report_path',
     ];
 
     public function company(): BelongsTo
