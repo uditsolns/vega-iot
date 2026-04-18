@@ -97,6 +97,7 @@ Route::prefix("v1")->group(function () {
             ->group(function () {
                 Route::get("/", "index");
                 Route::post("/", "grantAreas");
+                Route::put("/", "syncAreas");
                 Route::post("by-location", "grantAreasByLocation");
                 Route::post("by-hub", "grantAreasByHub");
                 Route::delete("clear", "clearAreas");
@@ -223,6 +224,7 @@ Route::prefix("v1")->group(function () {
                 Route::post("{device}/unassign", "unassign");
                 Route::patch("{device}/asset", "updateAssetInfo");
                 Route::patch("{device}/calibration", "updateCalibrationInfo");
+                Route::get("{device}/readings", "readings");
             });
 
         // Device Configuration

@@ -12,6 +12,7 @@ use App\Http\Requests\Device\UpdateDeviceAssetInfoRequest;
 use App\Http\Requests\Device\UpdateDeviceCalibrationInfoRequest;
 use App\Http\Requests\Device\UpdateDeviceRequest;
 use App\Http\Resources\DeviceResource;
+use App\Http\Resources\SensorReadingResource;
 use App\Models\Device;
 use App\Services\Device\DeviceService;
 use Illuminate\Http\JsonResponse;
@@ -128,5 +129,21 @@ class DeviceController extends Controller
         }
 
         return $this->success($this->deviceService->getStats($request->user()->company_id));
+    }
+
+    public function readings(Request $request, Device $device): JsonResponse
+    {
+        $this->authorize('view', $device);
+
+        $request->validate([
+            'date'      => ['nullable', 'date'],
+            'from'      => ['nullable', 'date', 'required_with:to'],
+            'to'        => ['nullable', 'date', 'required_with:from', 'after_or_equal:from'],
+            'sensor_id' => ['nullable', 'integer', 'exists:device_sensors,id'],
+        ]);
+
+        $result = $this->deviceService->getReadings($device, $request->all());
+
+        return $this->collection(SensorReadingResource::collection($result));
     }
 }

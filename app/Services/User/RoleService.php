@@ -44,8 +44,8 @@ class RoleService
         $role = Role::create($data);
 
         // Attach permissions if provided
-        if (isset($data["permission_ids"])) {
-            $role->permissions()->sync($data["permission_ids"]);
+        if (isset($data["permissions"])) {
+            $role->permissions()->sync($data["permissions"]);
         }
 
         return $role->fresh(["permissions"]);
@@ -65,8 +65,8 @@ class RoleService
         $role->update($data);
 
         // Update permissions if provided
-        if (isset($data["permission_ids"])) {
-            $role->permissions()->sync($data["permission_ids"]);
+        if (isset($data["permissions"])) {
+            $role->permissions()->sync($data["permissions"]);
         }
 
         return $role->fresh(["permissions"]);

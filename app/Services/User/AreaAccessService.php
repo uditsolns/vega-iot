@@ -61,6 +61,46 @@ class AreaAccessService
             ->log("Granted area \"{$area->name}\" to user \"{$user->email}\"");
     }
 
+    public function syncAccess(User $user, array $areaIds): array
+    {
+        $currentAreaIds = UserAreaAccess::where("user_id", $user->id)
+            ->pluck("area_id")
+            ->toArray();
+
+        $toAdd = array_diff($areaIds, $currentAreaIds);
+        $toRemove = array_diff($currentAreaIds, $areaIds);
+
+        // Add new ones
+        foreach ($toAdd as $areaId) {
+            UserAreaAccess::create([
+                "user_id" => $user->id,
+                "area_id" => $areaId,
+                "granted_by" => Auth::id(),
+            ]);
+        }
+
+        // Remove old ones
+        UserAreaAccess::where("user_id", $user->id)
+            ->whereIn("area_id", $toRemove)
+            ->delete();
+
+        activity("user")
+            ->event("synced_areas")
+            ->performedOn($user)
+            ->withProperties([
+                "user_id" => $user->id,
+                "added" => array_values($toAdd),
+                "removed" => array_values($toRemove),
+            ])
+            ->log("Synced areas for user \"{$user->email}\"");
+
+        return [
+            "added" => array_values($toAdd),
+            "removed" => array_values($toRemove),
+            "final_count" => count($areaIds),
+        ];
+    }
+
     /**
      * Revoke area access from a user.
      */

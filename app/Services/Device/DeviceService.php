@@ -8,20 +8,23 @@ use App\Models\Area;
 use App\Models\Company;
 use App\Models\Device;
 use App\Models\DeviceModel;
+use App\Models\SensorReading;
 use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 
 readonly class DeviceService
 {
     public function __construct(
         private DeviceConfigurationService $configService,
-        private DeviceSensorService $sensorService,
-    ) {}
+        private DeviceSensorService        $sensorService,
+    )
+    {
+    }
 
     public function list(array $filters, User $user): LengthAwarePaginator
     {
@@ -46,7 +49,8 @@ readonly class DeviceService
             ->paginate($filters['per_page'] ?? 20);
     }
 
-    public function showIncludes(): array {
+    public function showIncludes(): array
+    {
         return [
             'deviceModel',
             'company',
@@ -205,5 +209,42 @@ readonly class DeviceService
             'company_inventory' => (clone $base)->whereNull('area_id')->count(),
             'deployed' => (clone $base)->deployed()->count(),
         ];
+    }
+
+    public function getReadings(Device $device, array $filters): Collection
+    {
+        [$from, $to] = $this->resolveRange($filters);
+
+        $query = SensorReading::where('device_id', $device->id)
+            ->whereBetween('recorded_at', [$from, $to])
+            ->orderByDesc('recorded_at');
+
+        if (!empty($filters['sensor_id'])) {
+            $query->where('device_sensor_id', (int)$filters['sensor_id']);
+        }
+
+        return $query->get();
+    }
+
+    private function resolveRange(array $filters): array
+    {
+        if (!empty($filters['from']) && !empty($filters['to'])) {
+            $from = Carbon::parse($filters['from'])->startOfDay()->utc();
+            $to = Carbon::parse($filters['to'])->endOfDay()->utc();
+
+            if ($from->diffInDays($to) > 31) {
+                $to = $from->copy()->addDays(31)->endOfDay();
+            }
+
+            return [$from, $to];
+        }
+
+        if (!empty($filters['date'])) {
+            $day = Carbon::parse($filters['date'])->utc();
+            return [$day->copy()->startOfDay(), $day->copy()->endOfDay()];
+        }
+
+        $today = Carbon::today('UTC');
+        return [$today->copy()->startOfDay(), $today->copy()->endOfDay()];
     }
 }

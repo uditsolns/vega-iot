@@ -12,6 +12,7 @@ class SensorReadingResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
+            'device_sensor_id' => $this->device_sensor_id,
             'recorded_at' => $this->recorded_at?->toISOString(),
             'received_at' => $this->received_at?->toISOString(),
             'value'       => $this->resolveValue(),
